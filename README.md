@@ -35,5 +35,43 @@ GigShield is an AI-enabled parametric insurance platform designed to safeguard p
 *   **Weeks 3-4 (Phase 2):** Integrating the Python backend with weather APIs, implementing the dynamic weekly premium ML model, and demonstrating automated triggers.
 *   **Weeks 5-6 (Phase 3):** Finalizing the advanced fraud detection models, integrating the simulated payment sandbox, and completing the analytics dashboard.
 
-## 6. Repository Link
+## 6. How to Run
+
+### Backend (Python Flask)
+1. Navigate to the `backend` directory:
+   ```bash
+   cd backend
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the application:
+   ```bash
+   python app.py
+   ```
+   *The API will be available at `http://localhost:5000`.*
+
+### Frontend (React + Vite)
+1. Navigate to the `frontend` directory:
+   ```bash
+   cd frontend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+   *The application will be available at `http://localhost:5173`.*
+
+## 7. New Role-Based Features
+- **Landing Page**: Authenticate by phone number. Register as either a **Delivery Agent** or **Fleet Manager**.
+- **Payout Trends**: High-fidelity SVG-based analytics graphs for both roles.
+- **Order-Based Claims**: Agents can file claims against specific completed orders.
+- **Notification Badges**: Real-time status updates for new claims and approvals.
+
+## 8. Repository Link
 Link to Repository: https://github.com/Sudeep2412/GigShield-DEVTrails

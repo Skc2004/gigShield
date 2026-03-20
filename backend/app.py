@@ -2,18 +2,19 @@ import pandas as pd
 import numpy as np
 import requests
 import uuid
+import random
 import os
 from datetime import datetime
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.cluster import KMeans
-from models import db, Worker, Policy, Claim
+from models import db, User, Policy, Claim, Order
 
 app = Flask(__name__)
 CORS(app)
 
-# Configure SQLAlchemy
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'gigshield_production.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -22,6 +23,10 @@ db.init_app(app)
 
 with app.app_context():
     db.create_all()
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy", "service": "GigShield Backend"})
 
 # Dummy Model Training
 def _t_p():
@@ -51,41 +56,71 @@ def fetch_live_weather(lat, lon):
 
 @app.route('/api/auth/check', methods=['POST'])
 def check_user():
-    phone = request.json.get('phone')
-    worker = Worker.query.filter_by(phone=phone).first()
-    if worker:
-        return jsonify({
-            "exists": True, 
-            "user": {
-                "phone": worker.phone,
-                "name": worker.name,
-                "zone": worker.zone,
-                "platform": worker.platform
-            }
-        })
+    data = request.json
+    phone = data.get('phone')
+    password = data.get('password')
+    
+    user = User.query.filter_by(phone=phone).first()
+    if user:
+        if password and check_password_hash(user.password_hash, password):
+            return jsonify({
+                "exists": True, 
+                "user": {
+                    "id": user.id,
+                    "phone": user.phone,
+                    "name": user.name,
+                    "role": user.role,
+                    "zone": user.zone,
+                    "platform": user.platform
+                }
+            })
+        elif not password:
+            # Just checking if user exists for registration flow
+            return jsonify({"exists": True, "needs_password": True})
+        else:
+            return jsonify({"exists": True, "error": "Invalid password"}), 401
+            
     return jsonify({"exists": False})
 
 @app.route('/api/auth/register', methods=['POST'])
 def register_user():
     data = request.json
     phone = data.get('phone')
-    worker = Worker.query.filter_by(phone=phone).first()
-    if not worker:
-        worker = Worker(
+    role = data.get('role', 'agent')
+    user = User.query.filter_by(phone=phone).first()
+    if not user:
+        user = User(
             phone=phone,
             name=data.get('name', 'Partner'),
-            zone=data.get('zone', 'Koramangala, BLR'),
-            platform=data.get('platform', 'Food')
+            role=role,
+            zone=data.get('zone', 'Koramangala, BLR') if role == 'agent' else None,
+            platform=data.get('platform', 'Food') if role == 'agent' else None,
+            password_hash=generate_password_hash(data.get('password', '1234'))
         )
-        db.session.add(worker)
+        db.session.add(user)
+        db.session.flush()
+
+        if role == 'agent':
+            # Create 3-5 dummy orders to seed the dashboard
+            for _ in range(random.randint(3, 5)):
+                order = Order(
+                    user_id=user.id,
+                    distance_km=round(random.uniform(1.5, 12.0), 1),
+                    time_taken_mins=random.randint(15, 45)
+                )
+                db.session.add(order)
+            
         db.session.commit()
+
     return jsonify({
         "success": True, 
         "user": {
-            "phone": worker.phone,
-            "name": worker.name,
-            "zone": worker.zone,
-            "platform": worker.platform
+            "id": user.id,
+            "phone": user.phone,
+            "name": user.name,
+            "role": user.role,
+            "zone": user.zone,
+            "platform": user.platform
         }
     })
 
@@ -115,13 +150,12 @@ def get_quote():
     prediction = pm.predict(input_features)[0]
     weekly_premium = round(prediction, 2)
     
-    # Create policy if worker exists but lacks one
-    worker = Worker.query.filter_by(phone=phone).first()
-    if worker:
+    user = User.query.filter_by(phone=phone).first()
+    if user and user.role == 'agent':
         policy = Policy.query.filter_by(phone=phone).first()
         if not policy:
             new_policy = Policy(
-                worker_id=worker.id,
+                user_id=user.id,
                 phone=phone,
                 zone=zone,
                 platform=data.get('platform', 'Food'),
@@ -141,69 +175,161 @@ def get_quote():
 @app.route('/api/worker/data', methods=['GET'])
 def get_worker_data():
     phone = request.args.get('phone')
-    policy = Policy.query.filter_by(phone=phone).order_by(Policy.created_at.desc()).first()
-    claims = Claim.query.filter_by(phone=phone).order_by(Claim.timestamp.desc()).all()
+    user = User.query.filter_by(phone=phone).first()
+    if not user: return jsonify({"error": "User not found"}), 404
+
+    policy = Policy.query.filter_by(user_id=user.id).order_by(Policy.created_at.desc()).first()
+    claims = Claim.query.filter_by(user_id=user.id).order_by(Claim.timestamp.desc()).all()
+    orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).all()
     
-    pol_dict = None
-    if policy:
-        pol_dict = {
+    return jsonify({
+        'policy': {
             'id': policy.id,
             'platform': policy.platform,
             'premium': policy.premium,
             'created_at': policy.created_at
-        }
-        
-    claims_list = [{
-        'id': c.id,
-        'status': c.status,
-        'reason': c.reason,
-        'amount': c.amount,
-        'txn_id': c.txn_id,
-        'timestamp': c.timestamp
-    } for c in claims]
-
-    return jsonify({
-        'policy': pol_dict,
-        'claims': claims_list
+        } if policy else None,
+        'claims': [{
+            'id': c.id,
+            'status': c.status,
+            'reason': c.reason,
+            'amount': c.amount,
+            'txn_id': c.txn_id,
+            'order_id': c.order_id,
+            'timestamp': c.timestamp
+        } for c in claims],
+        'orders': [{
+            'id': o.id,
+            'distance_km': o.distance_km,
+            'time_taken_mins': o.time_taken_mins,
+            'created_at': o.created_at
+        } for o in orders]
     })
 
-@app.route('/api/simulate-disruption', methods=['POST'])
-def simulate_disruption():
+@app.route('/api/claims/initiate', methods=['POST'])
+def initiate_claim():
     data = request.json
-    disruption_type = data.get('type', 'rainstorm')
     phone = data.get('phone')
+    order_id = data.get('order_id')
+    weather_override = data.get('simulated_weather', None) # allow forcing weather for testing
     
-    worker = Worker.query.filter_by(phone=phone).first()
-    worker_id = worker.id if worker else None
+    user = User.query.filter_by(phone=phone).first()
+    if not user: return jsonify({"error": "User not found"}), 404
+    
+    order = Order.query.get(order_id)
+    if not order or order.user_id != user.id:
+        return jsonify({"error": "Invalid order ID"}), 400
 
-    payout_amount = 500 if disruption_type == 'rainstorm' else 750
-    txn_id = f"pi_prod_{uuid.uuid4().hex[:12]}"
+    # Avoid duplicate claims for same order
+    existing = Claim.query.filter_by(order_id=order.id).first()
+    if existing: return jsonify({"error": "Claim already filed for this order"}), 400
+
+    lat, lon = ZONES.get(user.zone, ZONES['Koramangala, BLR'])
+    curr_t, rain_mm, _, _ = fetch_live_weather(lat, lon)
+    
+    # Simple threshold logic:
+    if weather_override == 'rain' or rain_mm > 0:
+        weather_cond = 'rain'
+        base_payout = 100
+    elif weather_override == 'heat' or curr_t > 38:
+        weather_cond = 'heat'
+        base_payout = 150
+    else:
+        # Fuzz to rain for testing if they didn't provide override and weather is normal
+        weather_cond = 'rain'
+        base_payout = 100
+
+    # Add distance multiplier (e.g., 10 INR per km)
+    distance_bonus = order.distance_km * 10
+    payout_amount = round(base_payout + distance_bonus, 2)
     
     new_claim = Claim(
-        worker_id=worker_id,
+        user_id=user.id,
+        order_id=order.id,
         phone=phone,
-        status='approved',
-        reason=f'{disruption_type.capitalize()} Detected',
+        status='pending',
+        reason=f'{weather_cond.capitalize()} conditions detected. Route: {order.distance_km}km',
+        weather_condition=weather_cond,
         amount=payout_amount,
-        txn_id=txn_id
+        txn_id=None
     )
     db.session.add(new_claim)
     db.session.commit()
     
-    return jsonify({'status': 'triggered', 'claim_id': new_claim.id, 'payout': payout_amount})
+    return jsonify({'status': 'pending', 'claim_id': new_claim.id, 'payout': payout_amount})
 
-@app.route('/api/admin/dashboard', methods=['GET'])
-def admin_dashboard():
+@app.route('/api/manager/dashboard', methods=['GET'])
+def manager_dashboard():
+    agents = User.query.filter_by(role='agent').all()
+    claims = Claim.query.order_by(Claim.timestamp.desc()).all()
+    
     active_policies = db.session.query(db.func.count(Policy.id)).scalar() or 0
     total_premiums = db.session.query(db.func.sum(Policy.premium)).scalar() or 0
-    total_claims = db.session.query(db.func.sum(Claim.amount)).filter(Claim.status == 'approved').scalar() or 0
+    total_claims_paid = db.session.query(db.func.sum(Claim.amount)).filter(Claim.status == 'approved').scalar() or 0
     
     return jsonify({
+        'agents': [{
+            "id": u.id, "name": u.name, "phone": u.phone, 
+            "zone": u.zone, "platform": u.platform, "created_at": u.created_at
+        } for u in agents],
+        'claims': [{
+            "id": c.id, "agent_name": c.user.name if c.user else "Unknown",
+            "phone": c.phone, "amount": c.amount, "status": c.status,
+            "reason": c.reason, "order_id": c.order_id, "timestamp": c.timestamp
+        } for c in claims],
         'metrics': {
             'active_policies': active_policies,
             'total_premiums_collected': round(total_premiums, 2),
-            'total_claims_paid': total_claims,
+            'total_claims_paid': total_claims_paid,
+            'pending_claims': len([c for c in claims if c.status == 'pending'])
         }
+    })
+
+@app.route('/api/manager/claims/update', methods=['POST'])
+def update_claim():
+    data = request.json
+    claim_id = data.get('claim_id')
+    status = data.get('status')
+    
+    if status not in ['approved', 'declined']: 
+        return jsonify({"error": "Invalid status"}), 400
+        
+    claim = Claim.query.get(claim_id)
+    if claim:
+        claim.status = status
+        if status == 'approved':
+            claim.txn_id = f"pi_prod_{uuid.uuid4().hex[:12]}"
+        db.session.commit()
+        return jsonify({"success": True, "claim_id": claim.id, "status": claim.status, "txn_id": claim.txn_id})
+    return jsonify({"error": "Claim not found"}), 404
+
+@app.route('/api/analytics', methods=['GET'])
+def get_analytics():
+    role = request.args.get('role')
+    user_id = request.args.get('user_id')
+    
+    if role == 'agent' and user_id:
+        # Payouts over last 30 days and 12 months
+        claims = Claim.query.filter_by(user_id=user_id, status='approved').all()
+    else:
+        # Manager: Total payouts across all agents
+        claims = Claim.query.filter_by(status='approved').all()
+    
+    # Process into buckets (simplified for dummy purposes)
+    # In a real app we'd use SQL aggregation
+    daily = {}
+    monthly = {}
+    
+    for c in claims:
+        # Parse ISO date (YYYY-MM-DD...)
+        d_str = c.timestamp[:10]
+        m_str = c.timestamp[:7]
+        daily[d_str] = daily.get(d_str, 0) + c.amount
+        monthly[m_str] = monthly.get(m_str, 0) + c.amount
+        
+    return jsonify({
+        "daily": sorted([{"date": k, "amount": v} for k, v in daily.items()], key=lambda x: x['date']),
+        "monthly": sorted([{"month": k, "amount": v} for k, v in monthly.items()], key=lambda x: x['month'])
     })
 
 if __name__ == '__main__':

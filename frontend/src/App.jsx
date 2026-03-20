@@ -1,7 +1,118 @@
 import React, { useState, useEffect } from 'react'
-import { Shield, Home, FileText, Activity, Settings, User, LogOut, Bell, ChevronDown, CheckCircle, Smartphone, MapPin, ArrowRight, Zap, CloudRain, ThermometerSun, Lock, Clock, AlertTriangle, TrendingDown, Target, BarChart, Database, RefreshCcw, BellRing } from 'lucide-react'
+import { Shield, Home, FileText, Activity, Settings, User, LogOut, Bell, ChevronDown, CheckCircle, Smartphone, MapPin, ArrowRight, Zap, CloudRain, ThermometerSun, Lock, Clock, AlertTriangle, TrendingDown, Target, BarChart, Database, RefreshCcw, BellRing, TrendingUp, IndianRupee, X } from 'lucide-react'
 
-const API_BASE = 'http://localhost:5000/api'
+const API_BASE = 'http://127.0.0.1:5000/api'
+
+// Simple SVG Chart Component
+const PayoutChart = ({ data, type = 'line', xKey = 'date', yKey = 'amount' }) => {
+  if (!data || data.length === 0) return (
+    <div className="h-64 flex items-center justify-center text-slate-400 font-medium bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+      No payout data available yet
+    </div>
+  )
+
+  const maxVal = Math.max(...data.map(d => d[yKey])) * 1.2 || 100
+  const width = 600
+  const height = 240
+  const padding = 40
+
+  const points = data.map((d, i) => {
+    const x = padding + (i * (width - 2 * padding)) / (data.length - 1 || 1)
+    const y = height - padding - (d[yKey] / maxVal) * (height - 2 * padding)
+    return { x, y }
+  })
+
+  const pathD = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`
+
+  return (
+    <div className="w-full overflow-hidden">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto drop-shadow-sm">
+        {/* Grids */}
+        {[0, 1, 2, 3].map(i => {
+           const y = padding + (i * (height - 2 * padding)) / 3
+           return <line key={i} x1={padding} y1={y} x2={width - padding} y2={y} stroke="#f1f5f9" strokeWidth="1" />
+        })}
+        {/* Line */}
+        <path d={pathD} fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-in fade-in duration-1000" />
+        {/* Points */}
+        {points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="4" fill="#059669" className="hover:r-6 cursor-pointer transition-all" />
+        ))}
+        {/* Labels (First and Last) */}
+        <text x={points[0].x} y={height - 10} textAnchor="start" className="text-[10px] fill-slate-400 font-bold">{data[0][xKey]}</text>
+        <text x={points[points.length-1].x} y={height - 10} textAnchor="end" className="text-[10px] fill-slate-400 font-bold">{data[data.length-1][xKey]}</text>
+      </svg>
+    </div>
+  )
+}
+
+const AnalyticsModal = ({ isOpen, onClose, userRole, userMeta }) => {
+  const [data, setData] = useState({ daily: [], monthly: [] })
+  const [period, setPeriod] = useState('monthly') // 'daily' or 'monthly'
+
+  useEffect(() => {
+    if (isOpen) {
+      const url = `${API_BASE}/analytics?role=${userRole}${userRole === 'agent' ? `&user_id=${userMeta.id}` : ''}`
+      fetch(url).then(res => res.json()).then(d => setData(d))
+    }
+  }, [isOpen, userRole, userMeta?.id])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-[50] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="bg-white rounded-[2.5rem] w-full max-w-3xl relative z-10 shadow-3xl overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0">
+          <div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Payout Analytics</h2>
+            <p className="text-slate-500 text-sm font-medium">Historical earnings and platform distribution</p>
+          </div>
+          <button onClick={onClose} className="p-3 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        
+        <div className="p-8">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit mb-8">
+            <button onClick={() => setPeriod('daily')} className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${period === 'daily' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Daily View</button>
+            <button onClick={() => setPeriod('monthly')} className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${period === 'monthly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Monthly Trend</button>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8">
+            <div className="flex items-center justify-between mb-8">
+               <span className="text-xs font-black tracking-widest text-slate-400 uppercase">EARNINGS (INR)</span>
+               <div className="flex items-center space-x-4">
+                 <div className="flex items-center space-x-2">
+                   <div className="w-3 h-3 bg-emerald-500 rounded-full" />
+                   <span className="text-xs font-bold text-slate-600">Total Payouts</span>
+                 </div>
+               </div>
+            </div>
+            
+            <PayoutChart 
+              data={period === 'daily' ? data.daily : data.monthly} 
+              xKey={period === 'daily' ? 'date' : 'month'}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mt-6">
+            <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl">
+              <p className="text-xs font-black text-emerald-600/60 uppercase tracking-widest mb-1">TOTAL VOLUME</p>
+              <h3 className="text-2xl font-black text-emerald-800">
+                ₹{ (period === 'daily' ? data.daily : data.monthly).reduce((acc, curr) => acc + curr.amount, 0).toLocaleString() }
+              </h3>
+            </div>
+            <div className="bg-amber-50 border border-amber-100 p-6 rounded-3xl">
+              <p className="text-xs font-black text-amber-600/60 uppercase tracking-widest mb-1">DATA POINTS</p>
+              <h3 className="text-2xl font-black text-amber-800">{ (period === 'daily' ? data.daily : data.monthly).length } Records</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const LiveBackground = () => (
   <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-slate-50">
@@ -12,15 +123,15 @@ const LiveBackground = () => (
 
 const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
   const tabs = [
-    { id: 'home', label: 'Home', icon: Home },
+    { id: 'home', label: userRole === 'admin' ? 'Dashboard' : 'Home', icon: Home },
     ...(userRole === 'worker' ? [
-      { id: 'policy', label: 'Policy', icon: FileText },
-      { id: 'claims', label: 'Claims', icon: Activity }
+      { id: 'policy', label: 'Policy Details', icon: FileText },
+      { id: 'claims', label: 'Insurance Feed', icon: Activity }
     ] : []),
     ...(userRole === 'admin' ? [
-      { id: 'admin', label: 'Admin', icon: BarChart }
+      { id: 'admin', label: 'Audit Queue', icon: BarChart }
     ] : []),
-    { id: 'profile', label: 'Profile', icon: User }
+    { id: 'profile', label: 'User Profile', icon: User }
   ]
 
   return (
@@ -64,14 +175,20 @@ const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
   )
 }
 
-const Header = ({ title, userRole, setRole, liveWeather }) => {
+const Header = ({ title, userRole, userMeta, liveWeather, onOpenAnalytics, notifications = [] }) => {
   const [showNotif, setShowNotif] = useState(false)
+  const pendingCount = notifications.filter(n => !n.read).length
 
   return (
-    <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10 w-full">
+    <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-[100] w-full">
       <h2 className="text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
       
       <div className="flex items-center space-x-6">
+        <button onClick={onOpenAnalytics} className="flex items-center space-x-2 bg-emerald-50 text-emerald-700 px-5 py-2.5 rounded-full font-bold hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm group">
+          <TrendingUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
+          <span>Payout Trends</span>
+        </button>
+
         {liveWeather && (
           <div className="hidden md:flex items-center space-x-3 bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-full text-sm font-medium text-slate-600">
             <ThermometerSun className="w-4 h-4 text-amber-500" />
@@ -83,34 +200,31 @@ const Header = ({ title, userRole, setRole, liveWeather }) => {
         )}
 
         <div className="relative">
-          <button onClick={() => setShowNotif(!showNotif)} className={`text-slate-400 hover:text-emerald-600 transition-colors ${showNotif ? 'text-emerald-600' : ''}`}>
+          <button onClick={() => setShowNotif(!showNotif)} className={`text-slate-400 hover:text-emerald-600 transition-colors relative ${showNotif ? 'text-emerald-600' : ''}`}>
             <Bell className="w-6 h-6" />
-            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>
+            {pendingCount > 0 && <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 border-2 border-white rounded-full text-[8px] font-black text-white flex items-center justify-center">{pendingCount}</span>}
           </button>
           
           {showNotif && (
             <div className="absolute right-0 mt-4 w-80 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 z-50">
               <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                <span className="text-sm font-bold text-slate-800">Notifications</span>
-                <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">1 New</span>
+                <span className="text-sm font-bold text-slate-800 uppercase tracking-widest text-[10px]">Updates</span>
+                <span className="text-[10px] text-slate-500 font-bold">{notifications.length} Total</span>
               </div>
-              <div className="p-4 bg-emerald-50/50 border-l-4 border-emerald-500 hover:bg-emerald-50 transition-colors cursor-pointer">
-                <div className="flex items-start space-x-3">
-                  <BellRing className="w-5 h-5 text-emerald-600 mt-1" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-800 tracking-tight">Weather API Connected</p>
-                    <p className="text-xs text-emerald-700 mt-1 font-medium">Live telemetry via Open-Meteo successfully established for {liveWeather?.zone || 'your zone'}.</p>
-                    <p className="text-[10px] text-slate-400 mt-2 font-mono">Just now</p>
-                  </div>
-                </div>
+              <div className="max-h-64 overflow-y-auto px-2 py-2 space-y-1">
+                {notifications.length === 0 ? (
+                  <p className="text-[10px] text-slate-400 text-center py-6 font-bold uppercase tracking-widest">No recent data</p>
+                ) : (
+                  notifications.map((n, i) => (
+                    <div key={i} className={`p-4 rounded-xl text-xs border transition-colors ${n.read ? 'bg-slate-50 border-slate-100 text-slate-500' : 'bg-emerald-50 border-emerald-100 text-emerald-800 font-medium'}`}>
+                      {n.text}
+                      <div className="text-[10px] text-slate-400 mt-2 font-bold">{n.time}</div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
-        </div>
-
-        <div className="flex items-center space-x-2 text-sm font-bold text-slate-700 bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-full cursor-pointer hover:bg-emerald-100 transition-colors shadow-sm" onClick={() => setRole(userRole === 'admin' ? 'worker' : 'admin')}>
-          <span>{userRole === 'admin' ? 'Switch to Worker View' : 'Switch to Insurer Sandbox'}</span>
-          <RefreshCcw className="w-4 h-4 text-emerald-600" />
         </div>
       </div>
     </header>
@@ -121,8 +235,11 @@ const LandingPage = ({ onLogin }) => {
   const [step, setStep] = useState('login') // 'login' or 'register'
   const [phone, setPhone] = useState('')
   const [name, setName] = useState('')
+  const [role, setRole] = useState('agent') // 'agent' or 'manager'
   const [zone, setZone] = useState('')
   const [platform, setPlatform] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPasswordField, setShowPasswordField] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -136,11 +253,21 @@ const LandingPage = ({ onLogin }) => {
     try {
       const res = await fetch(`${API_BASE}/auth/check`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone })
+        body: JSON.stringify({ phone, password })
       })
       const data = await res.json()
+      
+      if (res.status === 401) {
+        setError('Incorrect password. Please try again.')
+        return
+      }
+
       if (data.exists) {
-        onLogin('worker', data.user)
+        if (data.needs_password) {
+          setShowPasswordField(true)
+        } else {
+          onLogin(data.user.role === 'manager' ? 'admin' : 'worker', data.user)
+        }
       } else {
         setStep('register')
       }
@@ -152,8 +279,8 @@ const LandingPage = ({ onLogin }) => {
   }
 
   const handleRegister = async () => {
-    if (!name || !zone || !platform) {
-      setError('Please select a domain, name, and zone to register.')
+    if (!name || (role === 'agent' && (!zone || !platform))) {
+      setError('Please fill in all required fields.')
       return
     }
     setLoading(true)
@@ -161,11 +288,11 @@ const LandingPage = ({ onLogin }) => {
     try {
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, name, zone, platform })
+        body: JSON.stringify({ phone, name, zone, platform, role, password })
       })
       const data = await res.json()
       if (data.success) {
-        onLogin('worker', data.user)
+        onLogin(data.user.role === 'manager' ? 'admin' : 'worker', data.user)
       } else {
         setError('Registration failed.')
       }
@@ -189,34 +316,51 @@ const LandingPage = ({ onLogin }) => {
 
            <div className="space-y-6 text-left">
              <div>
-               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">FULL NAME</label>
-               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Enter your full name" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold" />
-             </div>
-             
-             <div>
-               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">SELECT PRIMARY DOMAIN</label>
-               <div className="grid grid-cols-3 gap-2">
-                 {['Food', 'Grocery', 'E-commerce'].map((domain) => (
-                   <button key={domain} onClick={() => setPlatform(domain)} className={`p-4 rounded-xl border text-center transition-all ${platform === domain ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-200 hover:bg-slate-50'}`}>
-                     <h3 className="font-bold text-slate-800 text-sm">{domain}</h3>
-                   </button>
-                 ))}
+               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">ACCOUNT TYPE</label>
+               <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200">
+                 <button onClick={() => setRole('agent')} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all ${role === 'agent' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-400'}`}>Delivery Agent</button>
+                 <button onClick={() => setRole('manager')} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all ${role === 'manager' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-400'}`}>Fleet Manager</button>
                </div>
              </div>
 
              <div>
-               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">LIVE DATA ZONE</label>
-               <div className="relative shadow-sm rounded-xl">
-                 <select value={zone} onChange={(e) => setZone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 appearance-none focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold">
-                   <option value="" disabled>Choose work location...</option>
-                   <option value="Koramangala, BLR">Koramangala, BLR</option>
-                   <option value="Indiranagar, BLR">Indiranagar, BLR</option>
-                   <option value="Andheri West, MUM">Andheri West, MUM</option>
-                   <option value="South Ex, DEL">South Ex, DEL</option>
-                 </select>
-                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
-               </div>
+               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">FULL NAME</label>
+               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Enter your full name" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold" />
              </div>
+
+             <div>
+               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">CREATE PASSWORD / PIN</label>
+               <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold tracking-widest" />
+             </div>
+             
+             {role === 'agent' && (
+               <>
+                 <div>
+                   <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">SELECT PRIMARY DOMAIN</label>
+                   <div className="grid grid-cols-3 gap-2">
+                     {['Food', 'Grocery', 'E-commerce'].map((domain) => (
+                       <button key={domain} onClick={() => setPlatform(domain)} className={`p-4 rounded-xl border text-center transition-all ${platform === domain ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-200 hover:bg-slate-50'}`}>
+                         <h3 className="font-bold text-slate-800 text-sm">{domain}</h3>
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+
+                 <div>
+                   <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">LIVE DATA ZONE</label>
+                   <div className="relative shadow-sm rounded-xl">
+                     <select value={zone} onChange={(e) => setZone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 appearance-none focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold">
+                       <option value="" disabled>Choose work location...</option>
+                       <option value="Koramangala, BLR">Koramangala, BLR</option>
+                       <option value="Indiranagar, BLR">Indiranagar, BLR</option>
+                       <option value="Andheri West, MUM">Andheri West, MUM</option>
+                       <option value="South Ex, DEL">South Ex, DEL</option>
+                     </select>
+                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
+                   </div>
+                 </div>
+               </>
+             )}
 
              <button onClick={handleRegister} disabled={loading} className="w-full bg-emerald-800 hover:bg-emerald-900 border border-emerald-950 text-white font-bold py-5 rounded-2xl flex items-center justify-center transition-all mt-8 group">
                {loading ? <RefreshCcw className="w-6 h-6 animate-spin" /> : <> <span className="text-lg">Register & Connect</span> <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" /> </>}
@@ -270,6 +414,21 @@ const LandingPage = ({ onLogin }) => {
               </div>
             </div>
 
+            {showPasswordField && (
+              <div className="animate-in slide-in-from-top-2 duration-300">
+                <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">SECRET PASSWORD</label>
+                <div className="flex shadow-sm rounded-xl">
+                  <input 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••" 
+                    className="flex-1 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold tracking-widest"
+                  />
+                </div>
+              </div>
+            )}
+
             <button 
               onClick={handleCheckUser}
               disabled={loading}
@@ -277,7 +436,7 @@ const LandingPage = ({ onLogin }) => {
             >
               {loading ? <RefreshCcw className="w-6 h-6 animate-spin" /> : (
                 <>
-                  <span className="text-lg">Connect Datastream</span>
+                  <span className="text-lg">{showPasswordField ? 'Secure Login' : 'Connect Datastream'}</span>
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -412,148 +571,110 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
 }
 
 const ClaimsView = ({ userMeta, liveWeather }) => {
+  const [orders, setOrders] = useState([])
   const [claims, setClaims] = useState([])
   const [loading, setLoading] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState('')
 
   const fetchWorkerData = async () => {
     try {
       const res = await fetch(`${API_BASE}/worker/data?phone=${userMeta.phone}`)
       const data = await res.json()
       setClaims(data.claims)
+      setOrders(data.orders || [])
     } catch(e) {}
   }
 
-  const simulateClaimTrigger = async () => {
+  const handleInitiateClaim = async () => {
+    if (!selectedOrder) return
     setLoading(true)
     try {
-      await fetch(`${API_BASE}/simulate-disruption`, {
+      await fetch(`${API_BASE}/claims/initiate`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: liveWeather.rain_mm > 0 ? 'rainstorm' : 'heatwave', phone: userMeta.phone })
+        body: JSON.stringify({ phone: userMeta.phone, order_id: selectedOrder })
       })
       await fetchWorkerData()
+      setSelectedOrder('')
     } finally { setLoading(false) }
   }
 
   useEffect(() => { fetchWorkerData() }, [])
 
-  const latestClaim = claims[0]
-
   return (
     <div className="p-8 max-w-[1200px] mx-auto space-y-6">
-      {liveWeather?.high_risk && !latestClaim && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-lg shadow-amber-500/10 flex items-center animate-in fade-in slide-in-from-top-4">
-          <div className="bg-amber-100 border border-amber-200 p-3 rounded-xl mr-5">
-            <CloudRain className="w-6 h-6 text-amber-700" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-slate-800 text-lg tracking-tight mb-1">Grid Anomalies Detected via Open-Meteo.</h3>
-            <p className="text-amber-800/80 text-sm font-medium">Backend sensors are validating disruption thresholds for potential automated payout execution.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm group hover:border-emerald-200 transition-colors">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black text-slate-800 tracking-tighter">Your Claim Ledger</h2>
+              <span className="bg-slate-100 text-[10px] font-black uppercase px-3 py-1.5 rounded-full text-slate-500 border border-slate-200 tracking-widest">REAL-TIME SQL SYNC</span>
+            </div>
+            
+            <div className="space-y-4">
+              {claims.length === 0 ? (
+                <div className="py-12 border border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-slate-400">
+                  <Database className="w-10 h-10 mb-2 opacity-50" />
+                  <p className="font-bold">No claims associated with this profile</p>
+                </div>
+              ) : claims.map(c => (
+                <div key={c.id} className="bg-slate-50 border border-slate-100 p-6 rounded-2xl flex items-center justify-between group/item hover:bg-white hover:shadow-md transition-all">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${c.status === 'approved' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : c.status === 'declined' ? 'bg-red-50 border-red-100 text-red-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
+                      {c.status === 'approved' ? <CheckCircle className="w-6 h-6" /> : c.status === 'declined' ? <X className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
+                    </div>
+                    <div>
+                      <p className="font-black text-slate-800 tracking-tight">Order #{c.order_id.slice(0,8)}</p>
+                      <p className="text-xs text-slate-500 font-medium">{c.reason}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-black text-lg text-slate-800 tracking-tighter">₹{c.amount}</p>
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${c.status === 'approved' ? 'text-emerald-600' : c.status === 'declined' ? 'text-red-500' : 'text-amber-600'}`}>{c.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      )}
 
-      <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between group hover:border-emerald-200 transition-colors">
-        <div className="mb-6 md:mb-0">
-          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-2">API-DRIVEN EXECUTION</span>
-          <h2 className="text-4xl md:text-5xl font-black text-slate-800 tracking-tighter mb-2">Zero-Touch Claims</h2>
-          <p className="text-slate-500 font-medium max-w-md leading-relaxed text-sm">Resilient Guardian AI validates weather grids directly via SQL updates. No human review. Instant UPI payout.</p>
-        </div>
-        <div className="bg-slate-50 border border-slate-200 px-6 py-4 rounded-2xl flex flex-col items-end shadow-sm">
-          <div className="flex items-center mb-1">
-            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full mr-2 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-            <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">System Active</span>
-          </div>
-          <span className="text-[10px] font-mono text-slate-400">Ping: 24ms • SQL Read/Write Sync</span>
-        </div>
-      </div>
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group">
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+            <div className="relative z-10">
+              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest px-3 py-1.5 border border-emerald-500/30 rounded-full inline-block bg-emerald-500/10 mb-6 font-mono">Telemetry Hook</span>
+              <h3 className="text-xl font-black text-white mb-2">Initiate Claim</h3>
+              <p className="text-slate-400 text-sm mb-8 font-medium">Select a completed order to check for weather-based payout triggers.</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="col-span-1 md:col-span-2 bg-slate-50 border border-slate-200 rounded-[2rem] p-8 shadow-sm">
-          <h3 className="text-xl font-bold text-slate-800 mb-8 tracking-tight">Backend Telemetry Graph</h3>
-          
-          {latestClaim ? (
-            <div className="relative pl-8 border-l-2 border-slate-200 space-y-10 animate-in fade-in duration-700">
-              <div className="relative">
-                <div className="absolute -left-[41px] w-8 h-8 bg-emerald-600 border-4 border-slate-50 rounded-full flex items-center justify-center top-0 shadow-sm text-white">
-                  <CheckCircle className="w-4 h-4" />
+              <div className="space-y-6">
+                <div>
+                   <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">COMPLETED ORDERS</label>
+                   <div className="space-y-2">
+                     {orders.map(o => (
+                        <button 
+                          key={o.id}
+                          onClick={() => setSelectedOrder(o.id)}
+                          className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedOrder === o.id ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-500'}`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold">#{o.id.slice(0,8)}</span>
+                            <span className="text-[10px] font-mono text-slate-500">{o.distance_km}km</span>
+                          </div>
+                        </button>
+                     ))}
+                   </div>
                 </div>
-                <h4 className="text-slate-800 font-bold mb-1 tracking-tight">Disruption Hook Fired</h4>
-                <p className="text-sm text-slate-500 font-medium mb-3">Weather threshold exceeded in coordinates [{ZONES_LAT_LON[userMeta.zone.split(',')[0]]?.lat}, {ZONES_LAT_LON[userMeta.zone.split(',')[0]]?.lon}].</p>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] uppercase font-black tracking-wider px-2 py-1 rounded">200 OK</span>
-              </div>
 
-              <div className="relative">
-                <div className="absolute -left-[41px] w-8 h-8 bg-emerald-600 border-4 border-slate-50 rounded-full flex items-center justify-center top-0 shadow-sm text-white">
-                   <Target className="w-4 h-4" />
-                </div>
-                <h4 className="text-slate-800 font-bold mb-1 tracking-tight">Fraud Detection Validated</h4>
-                <p className="text-sm text-slate-500 font-medium mb-3">K-Means model cross-referenced SQL metadata. No GPS spoofing anomaly detected.</p>
-                 <span className="bg-emerald-100 text-emerald-800 text-[10px] uppercase font-black tracking-wider px-2 py-1 rounded">CLEARED</span>
-              </div>
-
-              <div className="relative">
-                <div className="absolute -left-[41px] w-8 h-8 bg-amber-500 border-4 border-slate-50 rounded-full flex items-center justify-center top-0 shadow-sm text-white">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <h4 className="text-slate-800 font-bold mb-1 tracking-tight">Direct API Payout Calculated: ₹{latestClaim.amount}</h4>
-                <p className="text-sm text-slate-500 font-medium">Stripe ID: <code className="bg-slate-200 px-1 rounded text-red-600 text-xs">{latestClaim.txn_id}</code> executed.</p>
+                <button 
+                  onClick={handleInitiateClaim}
+                  disabled={loading || !selectedOrder}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-2xl transition-all shadow-lg shadow-emerald-900/40 border border-emerald-500 flex items-center justify-center disabled:opacity-30 group"
+                >
+                  {loading ? <RefreshCcw className="w-6 h-6 animate-spin" /> : (
+                    <><Zap className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" /> <span>Verify Payout</span></>
+                  )}
+                </button>
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center h-full">
-              <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center text-slate-400 mb-6">
-                 <Database className="w-10 h-10" />
-              </div>
-              <h3 className="font-bold text-slate-800 mb-2">Awaiting SQL Triggers</h3>
-              <p className="text-sm text-slate-500 max-w-sm">When the Open-Meteo SDK detects severe parameters in your zone, the Python worker instantly appends a claim to your ledger.</p>
-            </div>
-          )}
-        </div>
-
-        <div className="col-span-1 space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 relative overflow-hidden group shadow-xl">
-             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
-             
-             {/* Mock Map background */}
-             <div className="absolute inset-0 opacity-10 pointer-events-none">
-                <div className="w-[150%] h-[150%] border-2 border-slate-600 rounded-[3rem] transform rotate-12 -translate-x-10 -translate-y-10 absolute"></div>
-                <div className="w-full h-full border border-emerald-500/50 rounded-full transform -rotate-12 scale-150 absolute blur-[1px]"></div>
-             </div>
-             
-             <div className="relative z-10 text-white">
-               <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-6 py-1 px-3 border border-emerald-500/30 rounded-full inline-block bg-emerald-500/10">Grid Sensors</p>
-               <div className="space-y-5">
-                 <div className="flex justify-between items-center text-sm border-b border-slate-700 pb-3">
-                   <span className="text-slate-400 font-bold">Zone Ledger</span>
-                   <span className="text-slate-100 font-black">{userMeta.zone.split(',')[0]}</span>
-                 </div>
-                 <div className="flex justify-between items-center text-sm border-b border-slate-700 pb-3">
-                   <span className="text-slate-400 font-bold">Rain Engine</span>
-                   <span className="text-slate-100 font-black flex items-center font-mono tracking-tighter">
-                     {liveWeather?.rain_mm || 0} mm/hr 
-                     {(liveWeather?.rain_mm > 0) && <div className="w-2 h-2 ml-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></div>}
-                   </span>
-                 </div>
-                 <div className="flex justify-between items-center text-sm">
-                   <span className="text-slate-400 font-bold">UUID Socket</span>
-                   <span className="text-slate-300 font-mono text-[10px] tracking-widest">{userMeta.phone.slice(-4)}-GIGX</span>
-                 </div>
-               </div>
-             </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
-            <h4 className="font-bold text-slate-800 mb-2">Dev Sandbox</h4>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed mb-6">Force trigger a POST request to `/api/simulate-disruption` via the Flask API to test webhook resolution and active SQL inserts.</p>
-            <button 
-              onClick={simulateClaimTrigger}
-              disabled={loading}
-              className="w-full bg-slate-900 border border-slate-800 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl transition-all shadow-md text-sm flex items-center justify-center disabled:opacity-50"
-            >
-              {loading ? <RefreshCcw className="w-5 h-5 animate-spin" /> : (
-                <><Database className="w-4 h-4 mr-2" /> Inject Database Fuzz</>
-              )}
-            </button>
           </div>
         </div>
       </div>
@@ -561,117 +682,102 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
   )
 }
 
-const AdminDashboard = ({ adminData }) => {
+const AdminDashboard = ({ adminData, onUpdate }) => {
+  const [processing, setProcessing] = useState(null)
+
+  const handleUpdateClaim = async (claimId, status) => {
+    setProcessing(claimId)
+    try {
+      await fetch(`${API_BASE}/manager/claims/update`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claim_id: claimId, status })
+      })
+      onUpdate()
+    } finally { setProcessing(null) }
+  }
+
   return (
-    <div className="p-8 max-w-[1400px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 pb-4 border-b border-slate-200 gap-4">
-        <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-1">Insurer Analytics Terminal</h2>
-          <p className="text-sm font-bold text-slate-500 tracking-wide">Direct connection established to: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 border border-slate-200">gigshield_production.db</code></p>
+    <div className="p-8 max-w-[1400px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white border border-slate-200 shadow-sm p-8 rounded-[2rem]">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fleet Policies</p>
+          <p className="text-5xl font-black text-slate-800 tracking-tighter">{adminData?.metrics?.active_policies || 0}</p>
         </div>
-        <div className="flex space-x-2">
-           <span className="bg-emerald-100 text-emerald-800 text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded border border-emerald-200 flex items-center shadow-sm">
-             <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full mr-2 animate-pulse"></div>
-             Live SQL Binding
-           </span>
+        <div className="bg-white border border-slate-200 shadow-sm p-8 rounded-[2rem]">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Payouts</p>
+          <p className="text-5xl font-black text-slate-800 tracking-tighter">₹{adminData?.metrics?.total_claims_paid?.toLocaleString() || 0}</p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-white border-b-4 border-slate-900 shadow-sm p-6 rounded-2xl border border-slate-200 flex justify-between items-center group hover:-translate-y-1 transition-transform">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Ledger Policies</p>
-            <p className="text-5xl font-black text-slate-800 font-mono tracking-tighter">{adminData?.metrics?.active_policies || 0}</p>
-          </div>
-          <div className="w-14 h-14 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center text-slate-600 shadow-sm group-hover:bg-slate-900 group-hover:text-white transition-colors">
-            <Database className="w-6 h-6" />
-          </div>
+        <div className="bg-emerald-50 border border-emerald-100 shadow-sm p-8 rounded-[2rem]">
+          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Premiums Cache</p>
+          <p className="text-5xl font-black text-emerald-800 tracking-tighter">₹{adminData?.metrics?.total_premiums_collected?.toLocaleString() || 0}</p>
         </div>
-
-        <div className="bg-white border-b-4 border-amber-500 shadow-sm p-6 rounded-2xl border border-slate-200 flex justify-between items-center group hover:-translate-y-1 transition-transform">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total SQL Claims Payout</p>
-            <p className="text-5xl font-black text-slate-800 font-mono tracking-tighter">₹{adminData?.metrics?.total_claims_paid.toLocaleString() || 0}</p>
-          </div>
-          <div className="w-14 h-14 bg-amber-50 border border-amber-100 rounded-xl flex items-center justify-center text-amber-600 shadow-sm group-hover:bg-amber-500 group-hover:text-white transition-colors">
-            <IndianRupee className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 shadow-sm p-6 rounded-2xl flex justify-between items-center group hover:-translate-y-1 transition-transform">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Global Premium Cache</p>
-            <p className="text-5xl font-black text-emerald-700 font-mono tracking-tighter">₹{adminData?.metrics?.total_premiums_collected?.toLocaleString() || 0}</p>
-          </div>
-          <div className="w-14 h-14 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-            <TrendingDown className="w-6 h-6 rotate-180" />
-          </div>
+        <div className="bg-amber-50 border border-amber-100 shadow-sm p-8 rounded-[2rem]">
+          <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Pending Audit</p>
+          <p className="text-5xl font-black text-amber-800 tracking-tighter">{adminData?.metrics?.pending_claims || 0}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
-            <div>
-              <h3 className="text-xl font-black text-slate-800 tracking-tight">Open-Meteo Heatmap</h3>
-              <p className="text-xs font-bold text-slate-500">Overlaying active zones globally via API</p>
-            </div>
-            <span className="bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded border border-slate-200">SQL GEOSPATIAL</span>
-          </div>
-          
-          <div className="w-full h-[350px] bg-slate-900 rounded-2xl relative overflow-hidden group shadow-inner">
-            <div className="absolute inset-0 opacity-40 mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
-            <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-emerald-500/30 rounded-full blur-[40px] -translate-x-1/2 -translate-y-1/2 filter"></div>
-            
-            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
-            
-            <div className="absolute bottom-6 left-6 bg-slate-800/90 backdrop-blur rounded-xl p-5 shadow-2xl w-56 border border-slate-700">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Node Density Risk</p>
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="w-4 h-4 bg-emerald-600 border border-emerald-400 rounded-sm shadow-[0_0_8px_rgba(5,150,105,0.5)]"></div>
-                <span className="text-xs font-bold text-slate-200">Live Coverage Nodes</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-red-500 border border-red-400 rounded-sm"></div>
-                <span className="text-xs font-bold text-slate-200">Alert Triggers Fired</span>
-              </div>
-            </div>
+      <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+        <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-2xl font-black text-slate-800 tracking-tight">Claims Approval Queue</h3>
+          <div className="flex space-x-2">
+            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black tracking-widest px-3 py-1.5 rounded-full border border-emerald-200">LIVE SQL STREAM</span>
           </div>
         </div>
-
-        <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-8 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
-              <div>
-                <h3 className="text-xl font-black text-slate-800 tracking-tight leading-tight">Actuary Models</h3>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Random Forest Scikit Output</p>
-              </div>
-              <Activity className="w-5 h-5 text-slate-400" />
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-white border border-slate-200 p-4 rounded-xl flex items-center">
-                 <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center mr-4 shrink-0 text-slate-600"><AlertTriangle className="w-5 h-5" /></div>
-                 <div>
-                    <h4 className="text-sm font-bold text-slate-800">Fraud Engine</h4>
-                    <p className="text-xs font-medium text-emerald-600">K-Means Cluster: Normal Activity</p>
-                 </div>
-              </div>
-              <div className="bg-white border border-slate-200 p-4 rounded-xl flex items-center">
-                 <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center mr-4 shrink-0 text-slate-600"><ThermometerSun className="w-5 h-5" /></div>
-                 <div>
-                    <h4 className="text-sm font-bold text-slate-800">Forecast Matrix</h4>
-                    <p className="text-xs font-medium text-slate-500">No severe weather predicted 48hr.</p>
-                 </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-8">
-            <button className="w-full bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-all shadow-md text-sm flex items-center justify-center group">
-              <Database className="w-4 h-4 mr-2 group-hover:text-emerald-400 transition-colors" /> Download SQLite Dump
-            </button>
-          </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="px-8 py-5">Agent & Order</th>
+                <th className="px-8 py-5">Detection Proof</th>
+                <th className="px-8 py-5 text-right">Payout</th>
+                <th className="px-8 py-5 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {adminData?.claims?.filter(c => c.status === 'pending').map(c => (
+                <tr key={c.id} className="group hover:bg-slate-50 transition-colors">
+                  <td className="px-8 py-6">
+                    <p className="font-black text-slate-800 text-sm">{c.agent_name}</p>
+                    <p className="text-xs text-slate-400 font-mono">+91 {c.phone} • Order #{c.order_id.slice(0,8)}</p>
+                  </td>
+                  <td className="px-8 py-6 max-w-xs">
+                    <p className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg inline-block">{c.reason}</p>
+                    <p className="text-[10px] text-slate-400 mt-2 font-bold">{c.timestamp.replace('T', ' ').slice(0,16)}</p>
+                  </td>
+                  <td className="px-8 py-6 text-right font-black text-lg text-slate-800 tracking-tighter">
+                    ₹{c.amount}
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center justify-center space-x-3">
+                      <button 
+                        onClick={() => handleUpdateClaim(c.id, 'approved')} 
+                        disabled={processing === c.id}
+                        className="p-2.5 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-200"
+                        title="Approve Payout"
+                      >
+                         <CheckCircle className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleUpdateClaim(c.id, 'declined')} 
+                        disabled={processing === c.id}
+                        className="p-2.5 bg-red-100 text-red-700 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-200"
+                        title="Decline Claim"
+                      >
+                         <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {adminData?.claims?.filter(c => c.status === 'pending').length === 0 && (
+                <tr>
+                   <td colSpan="4" className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Everything is audited. No pending claims.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -776,10 +882,12 @@ const PolicyView = ({ userMeta, quote }) => {
 export default function App() {
   const [role, setRole] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
-  const [userMeta, setUserMeta] = useState(null) // { phone, zone, platform }
+  const [userMeta, setUserMeta] = useState(null) // { phone, zone, platform, id }
   const [quote, setQuote] = useState(null)
   const [adminData, setAdminData] = useState(null)
   const [liveWeather, setLiveWeather] = useState(null)
+  const [showAnalytics, setShowAnalytics] = useState(false)
+  const [notifications, setNotifications] = useState([])
 
   const fetchWeatherBackground = async (zone) => {
     try {
@@ -789,9 +897,11 @@ export default function App() {
   }
 
   const handleLogin = (assignedRole, meta) => {
-    setRole(assignedRole)
+    // If user role from DB is manager, force admin role in frontend
+    const finalRole = meta.role === 'manager' ? 'admin' : 'worker'
+    setRole(finalRole)
     setUserMeta(meta)
-    setActiveTab(assignedRole === 'admin' ? 'admin' : 'home')
+    setActiveTab(finalRole === 'admin' ? 'admin' : 'home')
     if (meta?.zone) fetchWeatherBackground(meta.zone)
   }
 
@@ -800,6 +910,7 @@ export default function App() {
     setUserMeta(null)
     setQuote(null)
     setLiveWeather(null)
+    setNotifications([])
   }
 
   const fetchQuote = async (zone, platform, phone) => {
@@ -820,18 +931,51 @@ export default function App() {
 
   const fetchAdminData = async () => {
     try {
-      const res = await fetch(`${API_BASE}/admin/dashboard`)
-      setAdminData(await res.json())
-    } catch(e) {}
+      const res = await fetch(`${API_BASE}/manager/dashboard`)
+      const data = await res.json()
+      setAdminData(data)
+      
+      // Notification Logic for Manager
+      if (data.metrics?.pending_claims > 0) {
+        setNotifications([{ text: `Found ${data.metrics.pending_claims} NEW pending claims requiring audit.`, time: 'Action Required', read: false }])
+      }
+    } catch(e) {
+      console.error("Fetch Admin Data Error:", e)
+    }
+  }
+
+  const fetchAgentNotifications = async () => {
+    if (!userMeta?.phone) return
+    try {
+      const res = await fetch(`${API_BASE}/worker/data?phone=${userMeta.phone}`)
+      const data = await res.json()
+      const newNotifs = []
+      data.claims.forEach(c => {
+         if (c.status === 'approved') newNotifs.push({ text: `CLAIM SUCCESS: Payout of ₹${c.amount} processed for Order #${c.order_id.slice(0,6)}`, time: 'Recently', read: false })
+         if (c.status === 'declined') newNotifs.push({ text: `CLAIM DENIED: Security audit failed for Order #${c.order_id.slice(0,6)}`, time: 'Recently', read: false })
+      })
+      setNotifications(prev => {
+        const existing = prev.map(p => p.text)
+        const unique = newNotifs.filter(n => !existing.includes(n.text))
+        return [...unique, ...prev].slice(0, 10)
+      })
+    } catch(e) {
+      console.error("Fetch Notifications Error:", e)
+    }
   }
 
   useEffect(() => {
-    if (activeTab === 'admin') fetchAdminData()
-    if (userMeta?.zone) {
-       const interval = setInterval(() => fetchWeatherBackground(userMeta.zone), 60000)
-       return () => clearInterval(interval)
-    }
-  }, [activeTab, userMeta])
+    if (role === 'admin') fetchAdminData()
+    if (role === 'worker') fetchAgentNotifications()
+    
+    const interval = setInterval(() => {
+       if (role === 'admin') fetchAdminData()
+       if (role === 'worker') fetchAgentNotifications()
+       if (userMeta?.zone) fetchWeatherBackground(userMeta.zone)
+    }, 20000)
+    
+    return () => clearInterval(interval)
+  }, [activeTab, userMeta, role])
 
   if (!role) return (
     <>
@@ -853,15 +997,29 @@ export default function App() {
       <LiveBackground />
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={role} onLogout={handleLogout} userMeta={userMeta} />
       <div className="flex-1 ml-64 flex flex-col h-screen overflow-y-auto relative z-10 selection:bg-emerald-200">
-        <Header title={getPageTitle()} userRole={role} setRole={(r) => {setRole(r); setActiveTab(r === 'admin' ? 'admin' : 'home')}} liveWeather={liveWeather} />
+        <Header 
+          title={getPageTitle()} 
+          userRole={role} 
+          userMeta={userMeta} 
+          liveWeather={liveWeather} 
+          onOpenAnalytics={() => setShowAnalytics(true)}
+          notifications={notifications}
+        />
         <main className="flex-1 overflow-x-hidden pt-4 pb-12">
           {activeTab === 'home' && role === 'worker' && <WorkerDashboard userMeta={userMeta} quote={quote} fetchQuote={fetchQuote} liveWeather={liveWeather} />}
           {activeTab === 'policy' && role === 'worker' && <PolicyView userMeta={userMeta} quote={quote} />}
           {activeTab === 'claims' && role === 'worker' && <ClaimsView userMeta={userMeta} liveWeather={liveWeather} />}
-          {activeTab === 'admin' && role === 'admin' && <AdminDashboard adminData={adminData} />}
+          {(activeTab === 'home' || activeTab === 'admin') && role === 'admin' && <AdminDashboard adminData={adminData} onUpdate={() => fetchAdminData()} />}
           {activeTab === 'profile' && <ProfileView userMeta={userMeta} userRole={role} onLogout={handleLogout} />}
         </main>
       </div>
+
+      <AnalyticsModal 
+        isOpen={showAnalytics} 
+        onClose={() => setShowAnalytics(false)} 
+        userRole={role === 'admin' ? 'manager' : 'agent'}
+        userMeta={userMeta}
+      />
     </div>
   )
 }
