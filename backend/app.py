@@ -1,4 +1,3 @@
-import sqlite3
 import pandas as pd
 import numpy as np
 import requests
@@ -9,48 +8,20 @@ from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.cluster import KMeans
+from models import db, Worker, Policy, Claim
 
 app = Flask(__name__)
 CORS(app)
 
-DATABASE = 'gigshield_production.db'
+# Configure SQLAlchemy
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'gigshield_production.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-        db.row_factory = sqlite3.Row
-    return db
+db.init_app(app)
 
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
-
-def init_db():
-    with app.app_context():
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS policies (
-                            id TEXT PRIMARY KEY,
-                            phone TEXT,
-                            zone TEXT,
-                            platform TEXT,
-                            premium REAL,
-                            status TEXT,
-                            created_at TEXT)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS claims (
-                            id TEXT PRIMARY KEY,
-                            phone TEXT,
-                            status TEXT,
-                            reason TEXT,
-                            amount REAL,
-                            txn_id TEXT,
-                            timestamp TEXT)''')
-        db.commit()
-
-init_db()
+with app.app_context():
+    db.create_all()
 
 # Dummy Model Training
 def _t_p():
@@ -78,6 +49,46 @@ def fetch_live_weather(lat, lon):
     except:
         return 35.0, 0.0, 15.0, False
 
+@app.route('/api/auth/check', methods=['POST'])
+def check_user():
+    phone = request.json.get('phone')
+    worker = Worker.query.filter_by(phone=phone).first()
+    if worker:
+        return jsonify({
+            "exists": True, 
+            "user": {
+                "phone": worker.phone,
+                "name": worker.name,
+                "zone": worker.zone,
+                "platform": worker.platform
+            }
+        })
+    return jsonify({"exists": False})
+
+@app.route('/api/auth/register', methods=['POST'])
+def register_user():
+    data = request.json
+    phone = data.get('phone')
+    worker = Worker.query.filter_by(phone=phone).first()
+    if not worker:
+        worker = Worker(
+            phone=phone,
+            name=data.get('name', 'Partner'),
+            zone=data.get('zone', 'Koramangala, BLR'),
+            platform=data.get('platform', 'Food')
+        )
+        db.session.add(worker)
+        db.session.commit()
+    return jsonify({
+        "success": True, 
+        "user": {
+            "phone": worker.phone,
+            "name": worker.name,
+            "zone": worker.zone,
+            "platform": worker.platform
+        }
+    })
+
 @app.route('/api/weather', methods=['GET'])
 def get_weather():
     zone = request.args.get('zone', 'Koramangala, BLR')
@@ -104,15 +115,21 @@ def get_quote():
     prediction = pm.predict(input_features)[0]
     weekly_premium = round(prediction, 2)
     
-    # Auto-enroll internally
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT id FROM policies WHERE phone=?", (phone,))
-    if not cursor.fetchone():
-        policy_id = str(uuid.uuid4())
-        cursor.execute("INSERT INTO policies (id, phone, zone, platform, premium, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       (policy_id, phone, zone, data.get('platform', 'Food'), weekly_premium, 'active', datetime.now().isoformat()))
-        db.commit()
+    # Create policy if worker exists but lacks one
+    worker = Worker.query.filter_by(phone=phone).first()
+    if worker:
+        policy = Policy.query.filter_by(phone=phone).first()
+        if not policy:
+            new_policy = Policy(
+                worker_id=worker.id,
+                phone=phone,
+                zone=zone,
+                platform=data.get('platform', 'Food'),
+                premium=weekly_premium,
+                status='active'
+            )
+            db.session.add(new_policy)
+            db.session.commit()
 
     return jsonify({
         'zone': zone,
@@ -124,15 +141,30 @@ def get_quote():
 @app.route('/api/worker/data', methods=['GET'])
 def get_worker_data():
     phone = request.args.get('phone')
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT id, platform, premium, created_at FROM policies WHERE phone=? ORDER BY created_at DESC LIMIT 1", (phone,))
-    pol = cursor.fetchone()
-    cursor.execute("SELECT id, status, reason, amount, txn_id, timestamp FROM claims WHERE phone=? ORDER BY timestamp DESC", (phone,))
-    claims = [dict(c) for c in cursor.fetchall()]
+    policy = Policy.query.filter_by(phone=phone).order_by(Policy.created_at.desc()).first()
+    claims = Claim.query.filter_by(phone=phone).order_by(Claim.timestamp.desc()).all()
+    
+    pol_dict = None
+    if policy:
+        pol_dict = {
+            'id': policy.id,
+            'platform': policy.platform,
+            'premium': policy.premium,
+            'created_at': policy.created_at
+        }
+        
+    claims_list = [{
+        'id': c.id,
+        'status': c.status,
+        'reason': c.reason,
+        'amount': c.amount,
+        'txn_id': c.txn_id,
+        'timestamp': c.timestamp
+    } for c in claims]
+
     return jsonify({
-        'policy': dict(pol) if pol else None,
-        'claims': claims
+        'policy': pol_dict,
+        'claims': claims_list
     })
 
 @app.route('/api/simulate-disruption', methods=['POST'])
@@ -141,32 +173,36 @@ def simulate_disruption():
     disruption_type = data.get('type', 'rainstorm')
     phone = data.get('phone')
     
-    db = get_db()
-    cursor = db.cursor()
-    claim_id = str(uuid.uuid4())
+    worker = Worker.query.filter_by(phone=phone).first()
+    worker_id = worker.id if worker else None
+
     payout_amount = 500 if disruption_type == 'rainstorm' else 750
     txn_id = f"pi_prod_{uuid.uuid4().hex[:12]}"
     
-    cursor.execute("INSERT INTO claims (id, phone, status, reason, amount, txn_id, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                   (claim_id, phone, 'approved', f'{disruption_type.capitalize()} Detected', payout_amount, txn_id, datetime.now().isoformat()))
-    db.commit()
+    new_claim = Claim(
+        worker_id=worker_id,
+        phone=phone,
+        status='approved',
+        reason=f'{disruption_type.capitalize()} Detected',
+        amount=payout_amount,
+        txn_id=txn_id
+    )
+    db.session.add(new_claim)
+    db.session.commit()
     
-    return jsonify({'status': 'triggered', 'claim_id': claim_id, 'payout': payout_amount})
+    return jsonify({'status': 'triggered', 'claim_id': new_claim.id, 'payout': payout_amount})
 
 @app.route('/api/admin/dashboard', methods=['GET'])
 def admin_dashboard():
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT COUNT(*), SUM(premium) FROM policies")
-    pol_row = cursor.fetchone()
-    cursor.execute("SELECT SUM(amount) FROM claims WHERE status='approved'")
-    payout_row = cursor.fetchone()
+    active_policies = db.session.query(db.func.count(Policy.id)).scalar() or 0
+    total_premiums = db.session.query(db.func.sum(Policy.premium)).scalar() or 0
+    total_claims = db.session.query(db.func.sum(Claim.amount)).filter(Claim.status == 'approved').scalar() or 0
     
     return jsonify({
         'metrics': {
-            'active_policies': pol_row[0] or 0,
-            'total_premiums_collected': round(pol_row[1] or 0, 2),
-            'total_claims_paid': payout_row[0] or 0,
+            'active_policies': active_policies,
+            'total_premiums_collected': round(total_premiums, 2),
+            'total_claims_paid': total_claims,
         }
     })
 

@@ -109,7 +109,7 @@ const Header = ({ title, userRole, setRole, liveWeather }) => {
         </div>
 
         <div className="flex items-center space-x-2 text-sm font-bold text-slate-700 bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-full cursor-pointer hover:bg-emerald-100 transition-colors shadow-sm" onClick={() => setRole(userRole === 'admin' ? 'worker' : 'admin')}>
-          <span>{userRole === 'admin' ? 'Insurer Sandbox' : 'Worker View'}</span>
+          <span>{userRole === 'admin' ? 'Switch to Worker View' : 'Switch to Insurer Sandbox'}</span>
           <RefreshCcw className="w-4 h-4 text-emerald-600" />
         </div>
       </div>
@@ -118,24 +118,116 @@ const Header = ({ title, userRole, setRole, liveWeather }) => {
 }
 
 const LandingPage = ({ onLogin }) => {
+  const [step, setStep] = useState('login') // 'login' or 'register'
   const [phone, setPhone] = useState('')
+  const [name, setName] = useState('')
   const [zone, setZone] = useState('')
   const [platform, setPlatform] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleVerify = async () => {
-    if (!phone || !zone || !platform) {
-      setError('Please select a domain, phone number, and zone.')
+  const handleCheckUser = async () => {
+    if (!phone || phone.length < 10) {
+      setError('Please enter a valid 10-digit mobile number.')
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      onLogin('worker', { phone, zone, platform })
+    setError('')
+    try {
+      const res = await fetch(`${API_BASE}/auth/check`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      })
+      const data = await res.json()
+      if (data.exists) {
+        onLogin('worker', data.user)
+      } else {
+        setStep('register')
+      }
+    } catch (e) {
+      setError('Failed to connect to backend.')
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
+  const handleRegister = async () => {
+    if (!name || !zone || !platform) {
+      setError('Please select a domain, name, and zone to register.')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, name, zone, platform })
+      })
+      const data = await res.json()
+      if (data.success) {
+        onLogin('worker', data.user)
+      } else {
+        setError('Registration failed.')
+      }
+    } catch (e) {
+      setError('Failed to connect to backend.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (step === 'register') {
+    return (
+      <div className="min-h-screen relative z-10 flex flex-col justify-center items-center p-6">
+        <div className="bg-white border text-center border-slate-100 rounded-[2rem] p-10 shadow-2xl shadow-slate-200/50 max-w-xl w-full">
+           <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-100">
+            <User className="w-10 h-10 text-emerald-600" />
+           </div>
+           <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Create New Profile</h2>
+           <p className="text-slate-500 text-sm mb-8 font-medium">No account found for +91 {phone}. Please register below.</p>
+           {error && <div className="bg-red-50 text-red-600 border border-red-200 text-sm font-bold p-4 rounded-xl mb-6 flex items-center animate-in shake"><AlertTriangle className="w-5 h-5 mr-2 shrink-0" /> {error}</div>}
+
+           <div className="space-y-6 text-left">
+             <div>
+               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">FULL NAME</label>
+               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Enter your full name" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold" />
+             </div>
+             
+             <div>
+               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">SELECT PRIMARY DOMAIN</label>
+               <div className="grid grid-cols-3 gap-2">
+                 {['Food', 'Grocery', 'E-commerce'].map((domain) => (
+                   <button key={domain} onClick={() => setPlatform(domain)} className={`p-4 rounded-xl border text-center transition-all ${platform === domain ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-200 hover:bg-slate-50'}`}>
+                     <h3 className="font-bold text-slate-800 text-sm">{domain}</h3>
+                   </button>
+                 ))}
+               </div>
+             </div>
+
+             <div>
+               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">LIVE DATA ZONE</label>
+               <div className="relative shadow-sm rounded-xl">
+                 <select value={zone} onChange={(e) => setZone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 appearance-none focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold">
+                   <option value="" disabled>Choose work location...</option>
+                   <option value="Koramangala, BLR">Koramangala, BLR</option>
+                   <option value="Indiranagar, BLR">Indiranagar, BLR</option>
+                   <option value="Andheri West, MUM">Andheri West, MUM</option>
+                   <option value="South Ex, DEL">South Ex, DEL</option>
+                 </select>
+                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
+               </div>
+             </div>
+
+             <button onClick={handleRegister} disabled={loading} className="w-full bg-emerald-800 hover:bg-emerald-900 border border-emerald-950 text-white font-bold py-5 rounded-2xl flex items-center justify-center transition-all mt-8 group">
+               {loading ? <RefreshCcw className="w-6 h-6 animate-spin" /> : <> <span className="text-lg">Register & Connect</span> <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" /> </>}
+             </button>
+           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // default to login
   return (
     <div className="min-h-screen relative z-10 flex flex-col md:flex-row">
       <div className="flex-1 p-12 flex flex-col justify-center">
@@ -151,36 +243,16 @@ const LandingPage = ({ onLogin }) => {
           <p className="text-xl text-slate-500 mt-8 leading-relaxed font-medium">
             Live Parametric coverage starting at <span className="font-bold text-slate-800 bg-amber-100 px-2 rounded">₹20/week</span>. Backed by Open-Meteo live datastreams.
           </p>
-
-          <div className="mt-12">
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">SELECT YOUR DOMAIN TO BEGIN</p>
-            <div className="grid grid-cols-3 gap-4">
-              {['Food', 'Grocery', 'E-commerce'].map((domain) => (
-                <button 
-                  key={domain}
-                  onClick={() => setPlatform(domain)}
-                  className={`p-6 rounded-2xl border text-left transition-all duration-300 ${platform === domain ? 'border-emerald-500 bg-emerald-50 shadow-[0_8px_30px_rgba(5,150,105,0.12)] -translate-y-1' : 'border-slate-200 bg-transparent hover:bg-white hover:shadow-sm'}`}
-                >
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${platform === domain ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                    {domain === 'Food' && <span className="font-black text-xl">W</span>}
-                    {domain === 'Grocery' && <span className="font-black text-xl">🛒</span>}
-                    {domain === 'E-commerce' && <span className="font-black text-xl">📦</span>}
-                  </div>
-                  <h3 className="font-bold text-slate-800 tracking-tight">{domain}</h3>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
       <div className="w-full md:w-[480px] bg-white border-l border-slate-200 p-8 flex flex-col justify-center shadow-[0_0_80px_rgba(0,0,0,0.03)] z-20">
         <div className="bg-white border text-center border-slate-100 rounded-[2rem] p-10 shadow-2xl shadow-slate-200/50">
           <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-100">
-            <Shield className="w-10 h-10 text-emerald-600" />
+            <Lock className="w-10 h-10 text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Quick Verification</h2>
-          <p className="text-slate-500 text-sm mb-8 font-medium">Link your partner profile instantly</p>
+          <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Partner Login</h2>
+          <p className="text-slate-500 text-sm mb-8 font-medium">Enter your registered mobile number</p>
 
           {error && <div className="bg-red-50 text-red-600 border border-red-200 text-sm font-bold p-4 rounded-xl mb-6 flex items-center animate-in shake"><AlertTriangle className="w-5 h-5 mr-2 shrink-0" /> {error}</div>}
 
@@ -193,32 +265,13 @@ const LandingPage = ({ onLogin }) => {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="98765 43210" 
-                  className="flex-1 bg-slate-50 border border-slate-200 border-r-0 rounded-l-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold font-mono tracking-wider"
+                  className="flex-1 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold font-mono tracking-wider"
                 />
-                <button className="bg-amber-500 hover:bg-amber-600 text-white px-6 font-bold rounded-r-xl transition-colors border border-amber-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">OTP</button>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">LIVE DATA ZONE</label>
-              <div className="relative shadow-sm rounded-xl">
-                <select 
-                  value={zone}
-                  onChange={(e) => setZone(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 appearance-none focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold"
-                >
-                  <option value="" disabled>Choose work location...</option>
-                  <option value="Koramangala, BLR">Koramangala, BLR</option>
-                  <option value="Indiranagar, BLR">Indiranagar, BLR</option>
-                  <option value="Andheri West, MUM">Andheri West, MUM</option>
-                  <option value="South Ex, DEL">South Ex, DEL</option>
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
               </div>
             </div>
 
             <button 
-              onClick={handleVerify}
+              onClick={handleCheckUser}
               disabled={loading}
               className="w-full bg-emerald-800 hover:bg-emerald-900 border border-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_8px_20px_rgba(5,150,105,0.3)] text-white font-bold py-5 rounded-2xl flex items-center justify-center transition-all mt-8 disabled:opacity-70 disabled:cursor-not-allowed group"
             >
@@ -632,6 +685,94 @@ const ZONES_LAT_LON = {
   'South Ex': { lat: 28.5684, lon: 77.2183 }
 }
 
+const ProfileView = ({ userMeta, userRole, onLogout }) => {
+  return (
+    <div className="p-8 max-w-[800px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm">
+        <div className="flex items-center space-x-6 mb-8 pb-8 border-b border-slate-100">
+          <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-800 font-bold text-3xl uppercase shadow-inner">
+            {userRole === 'admin' ? 'AD' : userMeta?.phone?.slice(-2) || 'WK'}
+          </div>
+          <div>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">{userRole === 'admin' ? 'System Administrator' : (userMeta?.name || `Partner +91 ******${userMeta?.phone?.slice(-4) || '0000'}`)}</h2>
+            <p className="text-emerald-600 font-bold capitalize mt-1 tracking-wide">{userRole} Account</p>
+          </div>
+        </div>
+        
+        {userRole === 'worker' && userMeta && (
+          <div className="space-y-6">
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+              <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">REGISTERED PHONE</p>
+              <p className="text-lg font-bold text-slate-800 font-mono">+91 {userMeta.phone}</p>
+            </div>
+            <div className="border border-slate-200 p-6 rounded-2xl">
+              <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">PRIMARY DOMAIN</p>
+              <p className="text-lg font-bold text-slate-800">{userMeta.platform} Delivery</p>
+            </div>
+            <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100">
+              <p className="text-[10px] font-black tracking-widest text-emerald-600/70 uppercase mb-1">LIVE DATA ZONE</p>
+              <p className="text-lg font-bold text-emerald-900">{userMeta.zone}</p>
+            </div>
+          </div>
+        )}
+
+        <button 
+          onClick={onLogout}
+          className="mt-8 w-full md:w-auto bg-red-50 hover:bg-red-100 border border-red-100 text-red-600 font-bold py-4 px-8 rounded-xl transition-colors flex items-center justify-center shadow-sm"
+        >
+          <LogOut className="w-5 h-5 mr-3" /> Sign Out
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const PolicyView = ({ userMeta, quote }) => {
+  return (
+    <div className="p-8 max-w-[1200px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      <div className="bg-white border border-slate-200 rounded-[2rem] p-10 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-10 pointer-events-none opacity-5">
+           <FileText className="w-64 h-64" />
+        </div>
+        <h2 className="text-4xl font-black text-slate-800 tracking-tighter mb-8 relative z-10">Active Policy Documents</h2>
+        {quote ? (
+          <div className="space-y-6 relative z-10">
+            <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2rem] shadow-inner">
+               <div className="flex items-center mb-4">
+                 <Shield className="w-8 h-8 text-emerald-600 mr-3" />
+                 <h3 className="text-2xl font-black text-slate-800 font-mono tracking-tight">Policy #GS-{userMeta.phone.slice(-4)}-{userMeta.zone.slice(0,3).toUpperCase()}</h3>
+               </div>
+               <p className="text-slate-500 font-medium mb-8 max-w-xl leading-relaxed">Continuous parametric protection for {userMeta.platform} earnings in your highly specific active zone: {userMeta.zone}. Trigger alerts are monitored 24/7 without deductibles.</p>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-slate-200">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Weekly Premium</p>
+                    <p className="text-3xl font-black text-slate-800">₹{quote.weekly_premium}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Coverage Status</p>
+                    <div className="flex items-center">
+                       <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full mr-2 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
+                       <p className="text-emerald-700 font-black uppercase text-sm tracking-widest">Active & Binding</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Live Weather Check</p>
+                    <p className="text-slate-800 font-bold tracking-tight">Open-Meteo REST API</p>
+                  </div>
+               </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+             <RefreshCcw className="w-10 h-10 animate-spin mb-4 text-emerald-200" />
+             <p className="font-bold">Fetching secure policy vault data...</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [role, setRole] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
@@ -715,8 +856,10 @@ export default function App() {
         <Header title={getPageTitle()} userRole={role} setRole={(r) => {setRole(r); setActiveTab(r === 'admin' ? 'admin' : 'home')}} liveWeather={liveWeather} />
         <main className="flex-1 overflow-x-hidden pt-4 pb-12">
           {activeTab === 'home' && role === 'worker' && <WorkerDashboard userMeta={userMeta} quote={quote} fetchQuote={fetchQuote} liveWeather={liveWeather} />}
+          {activeTab === 'policy' && role === 'worker' && <PolicyView userMeta={userMeta} quote={quote} />}
           {activeTab === 'claims' && role === 'worker' && <ClaimsView userMeta={userMeta} liveWeather={liveWeather} />}
-          {activeTab === 'admin' && <AdminDashboard adminData={adminData} />}
+          {activeTab === 'admin' && role === 'admin' && <AdminDashboard adminData={adminData} />}
+          {activeTab === 'profile' && <ProfileView userMeta={userMeta} userRole={role} onLogout={handleLogout} />}
         </main>
       </div>
     </div>
