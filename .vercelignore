@@ -1,0 +1,8 @@
+node_modules
+.git
+gigshield
+__pycache__
+*.pyc
+*.db
+frontend/node_modules
+.vercel

@@ -1,9 +1,34 @@
 import React, { useState, useEffect } from 'react'
-import { Shield, Home, FileText, Activity, Settings, User, LogOut, Bell, ChevronDown, CheckCircle, Smartphone, MapPin, ArrowRight, Zap, CloudRain, ThermometerSun, Lock, Clock, AlertTriangle, TrendingDown, Target, BarChart, Database, RefreshCcw, BellRing, TrendingUp, IndianRupee, X } from 'lucide-react'
+import { 
+  Shield, Zap, AlertTriangle, TrendingUp, Clock, MapPin, 
+  Activity, CheckCircle, X, FileText, BarChart3, List, 
+  User as UserIcon, LogOut, Search, Filter, ArrowRight,
+  Database, RefreshCcw, Bell, Smartphone, Globe, Info, Home, User, ThermometerSun, CloudRain, ChevronDown, Lock
+} from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area
+} from 'recharts';
 
 const API_BASE = 'http://127.0.0.1:5000/api'
 
+const ZONES_LAT_LON = {
+  'Koramangala, BLR': { lat: 12.93, lon: 77.62 },
+  'Indiranagar, BLR': { lat: 12.97, lon: 77.64 },
+  'Andheri West, MUM': { lat: 19.13, lon: 72.82 },
+  'South Ex, DEL': { lat: 28.57, lon: 77.22 }
+}
+
 // Simple SVG Chart Component
+const authFetch = async (url, options = {}) => {
+  const token = localStorage.getItem('gig_token');
+  const headers = { ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (!headers['Content-Type'] && options.body && typeof options.body === 'string') {
+    headers['Content-Type'] = 'application/json';
+  }
+  return fetch(url, { ...options, headers });
+};
+
 const PayoutChart = ({ data, type = 'line', xKey = 'date', yKey = 'amount' }) => {
   if (!data || data.length === 0) return (
     <div className="h-64 flex items-center justify-center text-slate-400 font-medium bg-slate-50 rounded-2xl border border-dashed border-slate-200">
@@ -11,37 +36,25 @@ const PayoutChart = ({ data, type = 'line', xKey = 'date', yKey = 'amount' }) =>
     </div>
   )
 
-  const maxVal = Math.max(...data.map(d => d[yKey])) * 1.2 || 100
-  const width = 600
-  const height = 240
-  const padding = 40
-
-  const points = data.map((d, i) => {
-    const x = padding + (i * (width - 2 * padding)) / (data.length - 1 || 1)
-    const y = height - padding - (d[yKey] / maxVal) * (height - 2 * padding)
-    return { x, y }
-  })
-
-  const pathD = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`
-
   return (
-    <div className="w-full overflow-hidden">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto drop-shadow-sm">
-        {/* Grids */}
-        {[0, 1, 2, 3].map(i => {
-           const y = padding + (i * (height - 2 * padding)) / 3
-           return <line key={i} x1={padding} y1={y} x2={width - padding} y2={y} stroke="#f1f5f9" strokeWidth="1" />
-        })}
-        {/* Line */}
-        <path d={pathD} fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-in fade-in duration-1000" />
-        {/* Points */}
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r="4" fill="#059669" className="hover:r-6 cursor-pointer transition-all" />
-        ))}
-        {/* Labels (First and Last) */}
-        <text x={points[0].x} y={height - 10} textAnchor="start" className="text-[10px] fill-slate-400 font-bold">{data[0][xKey]}</text>
-        <text x={points[points.length-1].x} y={height - 10} textAnchor="end" className="text-[10px] fill-slate-400 font-bold">{data[data.length-1][xKey]}</text>
-      </svg>
+    <div className="h-64 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data.map(d => ({ name: d[xKey], value: d[yKey] }))}>
+            <defs>
+              <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 'bold'}} />
+            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 'bold'}} />
+            <RechartsTooltip 
+              contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+            />
+            <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorValue)" />
+          </AreaChart>
+        </ResponsiveContainer>
     </div>
   )
 }
@@ -53,9 +66,10 @@ const AnalyticsModal = ({ isOpen, onClose, userRole, userMeta }) => {
   useEffect(() => {
     if (isOpen) {
       const url = `${API_BASE}/analytics?role=${userRole}${userRole === 'agent' ? `&user_id=${userMeta.id}` : ''}`
-      fetch(url).then(res => res.json()).then(d => setData(d))
+      authFetch(url).then(res => res.json()).then(d => setData(d))
     }
   }, [isOpen, userRole, userMeta?.id])
+
 
   if (!isOpen) return null
 
@@ -129,9 +143,9 @@ const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
       { id: 'claims', label: 'Insurance Feed', icon: Activity }
     ] : []),
     ...(userRole === 'admin' ? [
-      { id: 'admin', label: 'Audit Queue', icon: BarChart }
+      { id: 'admin', label: 'Audit Queue', icon: BarChart3 }
     ] : []),
-    { id: 'profile', label: 'User Profile', icon: User }
+    { id: 'profile', label: 'User Profile', icon: UserIcon }
   ]
 
   return (
@@ -235,7 +249,6 @@ const LandingPage = ({ onLogin }) => {
   const [step, setStep] = useState('login') // 'login' or 'register'
   const [phone, setPhone] = useState('')
   const [name, setName] = useState('')
-  const [role, setRole] = useState('agent') // 'agent' or 'manager'
   const [zone, setZone] = useState('')
   const [platform, setPlatform] = useState('')
   const [password, setPassword] = useState('')
@@ -251,7 +264,7 @@ const LandingPage = ({ onLogin }) => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`${API_BASE}/auth/check`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, password })
       })
@@ -266,7 +279,8 @@ const LandingPage = ({ onLogin }) => {
         if (data.needs_password) {
           setShowPasswordField(true)
         } else {
-          onLogin(data.user.role === 'manager' ? 'admin' : 'worker', data.user)
+          localStorage.setItem('gig_token', data.access_token)
+          onLogin(data.user.role === 'FLEET_MANAGER' ? 'admin' : 'worker', data.user)
         }
       } else {
         setStep('register')
@@ -279,7 +293,7 @@ const LandingPage = ({ onLogin }) => {
   }
 
   const handleRegister = async () => {
-    if (!name || (role === 'agent' && (!zone || !platform))) {
+    if (!name || !zone || !platform) {
       setError('Please fill in all required fields.')
       return
     }
@@ -288,11 +302,12 @@ const LandingPage = ({ onLogin }) => {
     try {
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, name, zone, platform, role, password })
+        body: JSON.stringify({ phone, name, base_location: zone, company: platform, password })
       })
       const data = await res.json()
       if (data.success) {
-        onLogin(data.user.role === 'manager' ? 'admin' : 'worker', data.user)
+        localStorage.setItem('gig_token', data.access_token)
+        onLogin(data.user.role === 'FLEET_MANAGER' ? 'admin' : 'worker', data.user)
       } else {
         setError('Registration failed.')
       }
@@ -308,20 +323,13 @@ const LandingPage = ({ onLogin }) => {
       <div className="min-h-screen relative z-10 flex flex-col justify-center items-center p-6">
         <div className="bg-white border text-center border-slate-100 rounded-[2rem] p-10 shadow-2xl shadow-slate-200/50 max-w-xl w-full">
            <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-100">
-            <User className="w-10 h-10 text-emerald-600" />
+            <UserIcon className="w-10 h-10 text-emerald-600" />
            </div>
            <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Create New Profile</h2>
            <p className="text-slate-500 text-sm mb-8 font-medium">No account found for +91 {phone}. Please register below.</p>
            {error && <div className="bg-red-50 text-red-600 border border-red-200 text-sm font-bold p-4 rounded-xl mb-6 flex items-center animate-in shake"><AlertTriangle className="w-5 h-5 mr-2 shrink-0" /> {error}</div>}
 
            <div className="space-y-6 text-left">
-             <div>
-               <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">ACCOUNT TYPE</label>
-               <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200">
-                 <button onClick={() => setRole('agent')} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all ${role === 'agent' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-400'}`}>Delivery Agent</button>
-                 <button onClick={() => setRole('manager')} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all ${role === 'manager' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-400'}`}>Fleet Manager</button>
-               </div>
-             </div>
 
              <div>
                <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">FULL NAME</label>
@@ -333,8 +341,6 @@ const LandingPage = ({ onLogin }) => {
                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold tracking-widest" />
              </div>
              
-             {role === 'agent' && (
-               <>
                  <div>
                    <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">SELECT PRIMARY DOMAIN</label>
                    <div className="grid grid-cols-3 gap-2">
@@ -359,8 +365,6 @@ const LandingPage = ({ onLogin }) => {
                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
                    </div>
                  </div>
-               </>
-             )}
 
              <button onClick={handleRegister} disabled={loading} className="w-full bg-emerald-800 hover:bg-emerald-900 border border-emerald-950 text-white font-bold py-5 rounded-2xl flex items-center justify-center transition-all mt-8 group">
                {loading ? <RefreshCcw className="w-6 h-6 animate-spin" /> : <> <span className="text-lg">Register & Connect</span> <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" /> </>}
@@ -448,10 +452,65 @@ const LandingPage = ({ onLogin }) => {
   )
 }
 
-const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
+const WorkerDashboard = ({ userMeta, activePolicy, lifetimePayout, quote, fetchQuote, liveWeather, onAcceptQuote }) => {
   useEffect(() => {
-    if (!quote) fetchQuote(userMeta.zone, userMeta.platform, userMeta.phone)
-  }, [])
+    if (!activePolicy && !quote) fetchQuote()
+  }, [activePolicy, quote])
+
+  if (!activePolicy) {
+    if (!quote || !quote.options) return (
+      <div className="flex flex-col items-center justify-center py-32 text-slate-400">
+         <RefreshCcw className="w-10 h-10 animate-spin mb-4 text-emerald-200" />
+         <p className="font-bold">Analyzing real-time AI risk factors...</p>
+      </div>
+    )
+
+    const tiers = ['standard', 'premium', 'platinum']
+
+    return (
+      <div className="p-8 max-w-[1200px] mx-auto space-y-8 animate-in fade-in">
+         <div>
+           <h2 className="text-4xl font-black text-slate-800 tracking-tighter mb-2">Select Protection Plan</h2>
+           <p className="text-slate-500 font-medium font-mono text-sm">Target Location: {userMeta?.base_location}</p>
+           <p className="text-emerald-700 font-bold text-xs uppercase tracking-widest mt-2">Coverage Period: 7 Days (Weekly Cycles)</p>
+         </div>
+
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {tiers.map(tier => {
+               const opts = quote.options[tier]
+               if (!opts) return null;
+               return (
+                 <div key={tier} className={`border-2 rounded-[2rem] p-8 relative overflow-hidden transition-all hover:-translate-y-1 ${tier === 'platinum' ? 'border-emerald-500 bg-emerald-50 shadow-emerald-500/10 shadow-xl' : 'border-slate-200 bg-white shadow-sm hover:border-slate-300'}`}>
+                    {tier === 'platinum' && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-black tracking-widest px-4 py-1 rounded-bl-xl uppercase">Best Value</div>}
+                    <h3 className="text-2xl font-black text-slate-800 capitalize mb-4">{tier} Tier</h3>
+                    <div className="mb-8">
+                      <div className="flex items-baseline space-x-1">
+                        <span className="text-4xl font-black text-slate-800">₹{opts.premium}</span>
+                        <span className="text-slate-500 font-bold text-sm">/WEEK</span>
+                      </div>
+                      <p className="text-slate-400 text-sm mt-3 leading-relaxed">Covers up to <span className="text-slate-800 font-bold">₹{opts.payout}</span> in loss of income per week.</p>
+                      
+                      {/* AI Transparency Widget */}
+                      <div className="mt-4 p-3 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-between">
+                        <div>
+                           <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">AI Risk Nudge</p>
+                           <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
+                              {quote.risk_factors?.ai_nudge > 0 ? `+₹${quote.risk_factors.ai_nudge} Risk Adj.` : `₹${quote.risk_factors?.ai_nudge || 0} Safe Zone Adj.`}
+                           </p>
+                        </div>
+                        <Activity className="w-3 h-3 text-indigo-500" />
+                      </div>
+                    </div>
+                    <button onClick={() => onAcceptQuote(opts.id)} className={`w-full py-4 rounded-xl font-bold flex justify-center items-center ${tier === 'platinum' || tier === 'premium' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                       Activate Protection <ArrowRight className="w-5 h-5 ml-2" />
+                    </button>
+                 </div>
+               )
+            })}
+         </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-8 max-w-[1200px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -463,7 +522,7 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
               <Shield className="w-3 h-3 mr-1.5 text-emerald-300" /> LIVE SQL RECORD: ACTIVE
             </span>
             <h2 className="text-5xl md:text-6xl font-black tracking-tighter mb-2 text-white drop-shadow-sm">STATUS: COVERED</h2>
-            <p className="text-emerald-100/80 font-medium font-mono text-sm tracking-wide">Policy #GS-{userMeta.phone.slice(-4)}-{userMeta.zone.slice(0,3).toUpperCase()} • Active since 06:00 AM</p>
+            <p className="text-emerald-100/80 font-medium font-mono text-sm tracking-wide">Policy #GS-{userMeta?.phone?.slice(-4)}-{userMeta?.base_location?.slice(0,3).toUpperCase()} • Active since 06:00 AM</p>
           </div>
           <div className="hidden lg:flex w-32 h-32 bg-emerald-600/50 backdrop-blur border border-emerald-500/50 rounded-[2rem] items-center justify-center transform rotate-6 shadow-2xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-tr from-emerald-800 to-transparent"></div>
@@ -481,11 +540,11 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
             <span className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black tracking-widest px-3 py-1 rounded-full uppercase">Lifetime Payouts</span>
           </div>
           <div className="relative z-10">
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2">Total Protected Earnings</p>
-            <p className="text-5xl md:text-7xl font-black text-slate-800 tracking-tighter">₹8,500</p>
+            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2">Total Protected Income</p>
+            <p className="text-5xl md:text-7xl font-black text-slate-800 tracking-tighter">₹{((userMeta?.daily_earnings || 1000) * 30).toLocaleString()}</p>
             <div className="flex justify-between items-center mt-6 pt-6 border-t border-slate-100">
               <div className="flex items-center text-xs font-bold text-slate-500">
-                <Smartphone className="w-4 h-4 mr-2 text-emerald-600" /> Linked to {userMeta.platform} UPI
+                <Smartphone className="w-4 h-4 mr-2 text-emerald-600" /> Linked to {userMeta?.company} UPI
               </div>
             </div>
           </div>
@@ -494,13 +553,13 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
         <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-8 shadow-xl flex flex-col justify-between relative overflow-hidden group">
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay"></div>
           <div className="absolute top-0 right-0 p-6 pointer-events-none z-10">
-             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400"><TrendingDown className="w-4 h-4 rotate-180" /></div>
+             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400"><TrendingUp className="w-4 h-4" /></div>
           </div>
           <div className="relative z-10">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Weekly Premium</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{activePolicy?.billing_cycle} Premium</p>
             <div className="flex items-baseline space-x-1">
-              <p className="text-5xl font-black text-white tracking-tighter">₹{quote?.weekly_premium || '---'}</p>
-              <span className="text-slate-500 font-bold">/wk</span>
+              <p className="text-5xl font-black text-white tracking-tighter">₹{activePolicy?.premium}</p>
+              <span className="text-slate-500 font-bold">/{activePolicy?.billing_cycle === 'Daily' ? 'day' : activePolicy?.billing_cycle === 'Weekly' ? 'wk' : 'mo'}</span>
             </div>
           </div>
           <div className="mt-8 relative z-10 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
@@ -519,7 +578,7 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
         <div className="col-span-1 md:col-span-2 bg-white border border-slate-200 rounded-[2rem] p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col md:flex-row items-center justify-between group hover:border-emerald-200 transition-colors">
           <div className="flex-1 w-full md:pr-8">
             <h3 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Real-Time Open-Meteo SDK</h3>
-            <p className="text-sm font-medium text-slate-500 mb-6 font-mono bg-slate-50 p-2 text-center md:text-left rounded-lg border border-slate-100">lat: {ZONES_LAT_LON[userMeta.zone.split(',')[0]]?.lat || '12.9'} / lon: {ZONES_LAT_LON[userMeta.zone.split(',')[0]]?.lon || '77.6'}</p>
+            <p className="text-sm font-medium text-slate-500 mb-6 font-mono bg-slate-50 p-2 text-center md:text-left rounded-lg border border-slate-100">lat: {ZONES_LAT_LON[userMeta?.base_location?.split(',')[0]]?.lat || '12.9'} / lon: {ZONES_LAT_LON[userMeta?.base_location?.split(',')[0]]?.lon || '77.6'}</p>
             
             <div className="grid grid-cols-2 gap-4">
                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4">
@@ -547,22 +606,13 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
           </div>
         </div>
 
-        <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-8 relative col-span-1 shadow-sm overflow-hidden">
-           <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-[30px] -mr-10 -mt-10"></div>
-           <div className="w-12 h-12 bg-white border border-amber-200 rounded-xl flex items-center justify-center shadow-sm text-yellow-500 mb-6">
-             <Zap className="w-6 h-6 fill-current" />
-           </div>
-           <h3 className="text-xl font-bold mb-2 tracking-tight text-slate-800">Next Reward Tier</h3>
-           <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">Unlock a permanent 10% base rate reduction in 2 weeks.</p>
-           
-           <div>
-             <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-emerald-700 mb-3">
-               <span>Level 4 Shield</span>
-               <span>60%</span>
-             </div>
-             <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-               <div className="w-[60%] h-full bg-amber-500 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]"></div>
-             </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-8 relative col-span-1 shadow-sm overflow-hidden flex flex-col justify-center text-center">
+           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-[30px] -mr-10 -mt-10"></div>
+           <h3 className="text-4xl font-black mb-2 tracking-tight text-emerald-700">₹{lifetimePayout?.toLocaleString() || 0}</h3>
+           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Aggregated Lifetime Claims Paid</p>
+           <div className="mt-4 bg-white border border-slate-200 p-4 rounded-xl">
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Plan</p>
+             <p className="text-lg font-black text-slate-800">{activePolicy?.tier_name} • {activePolicy?.billing_cycle}</p>
            </div>
         </div>
       </div>
@@ -575,10 +625,11 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
   const [claims, setClaims] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState('')
+  const [simulateDisruption, setSimulateDisruption] = useState(false) // NEW STATE
 
   const fetchWorkerData = async () => {
     try {
-      const res = await fetch(`${API_BASE}/worker/data?phone=${userMeta.phone}`)
+      const res = await authFetch(`${API_BASE}/worker/data`)
       const data = await res.json()
       setClaims(data.claims)
       setOrders(data.orders || [])
@@ -589,12 +640,18 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
     if (!selectedOrder) return
     setLoading(true)
     try {
-      await fetch(`${API_BASE}/claims/initiate`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: userMeta.phone, order_id: selectedOrder })
+      const res = await authFetch(`${API_BASE}/claims/initiate`, {
+        method: 'POST', body: JSON.stringify({ order_id: selectedOrder, simulate: simulateDisruption }) // SEND FLAG
       })
-      await fetchWorkerData()
-      setSelectedOrder('')
+      const data = await res.json()
+      
+      if (!data.success) {
+         alert(data.message) // SHOW REJECTION REASON IF NO WEATHER EVENT
+      } else {
+         await fetchWorkerData()
+         setSelectedOrder('')
+         setSimulateDisruption(false) // reset after success
+      }
     } finally { setLoading(false) }
   }
 
@@ -628,7 +685,7 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-lg text-slate-800 tracking-tighter">₹{c.amount}</p>
+                    <p className="font-black text-lg text-slate-800 tracking-tighter">₹{c.payout_amount?.toLocaleString()}</p>
                     <span className={`text-[10px] font-black uppercase tracking-widest ${c.status === 'approved' ? 'text-emerald-600' : c.status === 'declined' ? 'text-red-500' : 'text-amber-600'}`}>{c.status}</span>
                   </div>
                 </div>
@@ -664,6 +721,24 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
                    </div>
                 </div>
 
+                {/* Simulation Toggle */}
+                <label className="flex items-center space-x-3 cursor-pointer bg-slate-800/30 p-4 rounded-xl border border-slate-700 hover:border-amber-500/50 transition-colors mb-4 group">
+                  <div className="relative">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only" 
+                      checked={simulateDisruption} 
+                      onChange={(e) => setSimulateDisruption(e.target.checked)} 
+                    />
+                    <div className={`w-10 h-6 rounded-full transition-colors ${simulateDisruption ? 'bg-amber-500' : 'bg-slate-700'}`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${simulateDisruption ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                  </div>
+                  <div>
+                    <p className={`text-sm font-bold ${simulateDisruption ? 'text-amber-400' : 'text-slate-300'}`}>Simulate API Disruption</p>
+                    <p className="text-[10px] text-slate-500 font-medium leading-tight">Forces a parametric trigger (e.g. Flash Flood) for hackathon demo video.</p>
+                  </div>
+                </label>
+
                 <button 
                   onClick={handleInitiateClaim}
                   disabled={loading || !selectedOrder}
@@ -688,9 +763,8 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
   const handleUpdateClaim = async (claimId, status) => {
     setProcessing(claimId)
     try {
-      await fetch(`${API_BASE}/manager/claims/update`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claim_id: claimId, status })
+      await authFetch(`${API_BASE}/manager/claims/update`, {
+        method: 'POST', body: JSON.stringify({ claim_id: claimId, status })
       })
       onUpdate()
     } finally { setProcessing(null) }
@@ -740,14 +814,14 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
                 <tr key={c.id} className="group hover:bg-slate-50 transition-colors">
                   <td className="px-8 py-6">
                     <p className="font-black text-slate-800 text-sm">{c.agent_name}</p>
-                    <p className="text-xs text-slate-400 font-mono">+91 {c.phone} • Order #{c.order_id.slice(0,8)}</p>
+                    <p className="text-xs text-slate-400 font-mono">+91 {c.phone || 'N/A'} • Order #{c.order_id?.slice(0,8) || 'SYSTEM'}</p>
                   </td>
                   <td className="px-8 py-6 max-w-xs">
                     <p className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg inline-block">{c.reason}</p>
                     <p className="text-[10px] text-slate-400 mt-2 font-bold">{c.timestamp.replace('T', ' ').slice(0,16)}</p>
                   </td>
                   <td className="px-8 py-6 text-right font-black text-lg text-slate-800 tracking-tighter">
-                    ₹{c.amount}
+                    ₹{c.payout_amount?.toLocaleString()}
                   </td>
                   <td className="px-8 py-6">
                     <div className="flex items-center justify-center space-x-3">
@@ -784,12 +858,8 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
   )
 }
 
-const ZONES_LAT_LON = {
-  'Koramangala': { lat: 12.9352, lon: 77.6245 },
-  'Indiranagar': { lat: 12.9784, lon: 77.6408 },
-  'Andheri West': { lat: 19.1363, lon: 72.8277 },
-  'South Ex': { lat: 28.5684, lon: 77.2183 }
-}
+// Telemetry helper
+const getZoneCoords = (zone) => ZONES_LAT_LON[zone] || ZONES_LAT_LON['Koramangala, BLR'];
 
 const ProfileView = ({ userMeta, userRole, onLogout }) => {
   return (
@@ -813,11 +883,11 @@ const ProfileView = ({ userMeta, userRole, onLogout }) => {
             </div>
             <div className="border border-slate-200 p-6 rounded-2xl">
               <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">PRIMARY DOMAIN</p>
-              <p className="text-lg font-bold text-slate-800">{userMeta.platform} Delivery</p>
+              <p className="text-lg font-bold text-slate-800">{userMeta?.company} Delivery</p>
             </div>
             <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100">
               <p className="text-[10px] font-black tracking-widest text-emerald-600/70 uppercase mb-1">LIVE DATA ZONE</p>
-              <p className="text-lg font-bold text-emerald-900">{userMeta.zone}</p>
+              <p className="text-lg font-bold text-emerald-900">{userMeta?.base_location}</p>
             </div>
           </div>
         )}
@@ -833,7 +903,7 @@ const ProfileView = ({ userMeta, userRole, onLogout }) => {
   )
 }
 
-const PolicyView = ({ userMeta, quote }) => {
+const PolicyView = ({ userMeta, activePolicy }) => {
   return (
     <div className="p-8 max-w-[1200px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="bg-white border border-slate-200 rounded-[2rem] p-10 shadow-sm relative overflow-hidden">
@@ -841,18 +911,22 @@ const PolicyView = ({ userMeta, quote }) => {
            <FileText className="w-64 h-64" />
         </div>
         <h2 className="text-4xl font-black text-slate-800 tracking-tighter mb-8 relative z-10">Active Policy Documents</h2>
-        {quote ? (
+        {activePolicy ? (
           <div className="space-y-6 relative z-10">
             <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2rem] shadow-inner">
                <div className="flex items-center mb-4">
                  <Shield className="w-8 h-8 text-emerald-600 mr-3" />
-                 <h3 className="text-2xl font-black text-slate-800 font-mono tracking-tight">Policy #GS-{userMeta.phone.slice(-4)}-{userMeta.zone.slice(0,3).toUpperCase()}</h3>
+                 <h3 className="text-2xl font-black text-slate-800 font-mono tracking-tight">Policy #GS-{userMeta?.phone?.slice(-4)}-{userMeta?.base_location?.slice(0,3).toUpperCase()}</h3>
                </div>
-               <p className="text-slate-500 font-medium mb-8 max-w-xl leading-relaxed">Continuous parametric protection for {userMeta.platform} earnings in your highly specific active zone: {userMeta.zone}. Trigger alerts are monitored 24/7 without deductibles.</p>
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-slate-200">
+               <p className="text-slate-500 font-medium mb-8 max-w-xl leading-relaxed">Continuous parametric protection for {userMeta?.company} earnings in your active zone: {userMeta?.base_location}. Trigger alerts are monitored 24/7 without deductibles.</p>
+               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-8 border-t border-slate-200">
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Weekly Premium</p>
-                    <p className="text-3xl font-black text-slate-800">₹{quote.weekly_premium}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{activePolicy.billing_cycle} Premium</p>
+                    <p className="text-3xl font-black text-slate-800">₹{activePolicy.premium}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Max Payout</p>
+                    <p className="text-3xl font-black text-emerald-700">₹{activePolicy.payout}</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Coverage Status</p>
@@ -862,16 +936,16 @@ const PolicyView = ({ userMeta, quote }) => {
                     </div>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Live Weather Check</p>
-                    <p className="text-slate-800 font-bold tracking-tight">Open-Meteo REST API</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Plan Tier</p>
+                    <p className="text-slate-800 font-bold tracking-tight">{activePolicy.tier_name} • {activePolicy.billing_cycle}</p>
                   </div>
                </div>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-             <RefreshCcw className="w-10 h-10 animate-spin mb-4 text-emerald-200" />
-             <p className="font-bold">Fetching secure policy vault data...</p>
+             <AlertTriangle className="w-10 h-10 mb-4 text-amber-300" />
+             <p className="font-bold">No active policy. Select a plan from the Dashboard.</p>
           </div>
         )}
       </div>
@@ -882,7 +956,9 @@ const PolicyView = ({ userMeta, quote }) => {
 export default function App() {
   const [role, setRole] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
-  const [userMeta, setUserMeta] = useState(null) // { phone, zone, platform, id }
+  const [userMeta, setUserMeta] = useState(null)
+  const [activePolicy, setActivePolicy] = useState(null)
+  const [lifetimePayout, setLifetimePayout] = useState(0)
   const [quote, setQuote] = useState(null)
   const [adminData, setAdminData] = useState(null)
   const [liveWeather, setLiveWeather] = useState(null)
@@ -891,34 +967,32 @@ export default function App() {
 
   const fetchWeatherBackground = async (zone) => {
     try {
-      const res = await fetch(`${API_BASE}/weather?zone=${zone}`)
+      const res = await authFetch(`${API_BASE}/weather?zone=${zone}`)
       setLiveWeather(await res.json())
     } catch(e) {}
   }
 
   const handleLogin = (assignedRole, meta) => {
-    // If user role from DB is manager, force admin role in frontend
-    const finalRole = meta.role === 'manager' ? 'admin' : 'worker'
+    const finalRole = meta.role === 'FLEET_MANAGER' ? 'admin' : 'worker'
     setRole(finalRole)
     setUserMeta(meta)
     setActiveTab(finalRole === 'admin' ? 'admin' : 'home')
-    if (meta?.zone) fetchWeatherBackground(meta.zone)
+    if (meta?.base_location) fetchWeatherBackground(meta.base_location)
   }
 
   const handleLogout = () => {
+    localStorage.removeItem('gig_token')
     setRole(null)
     setUserMeta(null)
     setQuote(null)
+    setActivePolicy(null)
     setLiveWeather(null)
     setNotifications([])
   }
 
-  const fetchQuote = async (zone, platform, phone) => {
+  const fetchQuote = async () => {
     try {
-      const res = await fetch(`${API_BASE}/quote`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zone, platform, phone })
-      })
+      const res = await authFetch(`${API_BASE}/quotes/generate`, { method: 'POST' })
       const data = await res.json()
       setQuote(data)
       setLiveWeather({
@@ -931,11 +1005,10 @@ export default function App() {
 
   const fetchAdminData = async () => {
     try {
-      const res = await fetch(`${API_BASE}/manager/dashboard`)
+      const res = await authFetch(`${API_BASE}/manager/dashboard`)
       const data = await res.json()
       setAdminData(data)
       
-      // Notification Logic for Manager
       if (data.metrics?.pending_claims > 0) {
         setNotifications([{ text: `Found ${data.metrics.pending_claims} NEW pending claims requiring audit.`, time: 'Action Required', read: false }])
       }
@@ -947,12 +1020,15 @@ export default function App() {
   const fetchAgentNotifications = async () => {
     if (!userMeta?.phone) return
     try {
-      const res = await fetch(`${API_BASE}/worker/data?phone=${userMeta.phone}`)
+      const res = await authFetch(`${API_BASE}/worker/data`)
       const data = await res.json()
+      setActivePolicy(data.policy)
+      setLifetimePayout(data.lifetime_payout)
       const newNotifs = []
       data.claims.forEach(c => {
-         if (c.status === 'approved') newNotifs.push({ text: `CLAIM SUCCESS: Payout of ₹${c.amount} processed for Order #${c.order_id.slice(0,6)}`, time: 'Recently', read: false })
-         if (c.status === 'declined') newNotifs.push({ text: `CLAIM DENIED: Security audit failed for Order #${c.order_id.slice(0,6)}`, time: 'Recently', read: false })
+         if (c.status === 'approved') newNotifs.push({ text: `CLAIM SUCCESS: Payout of ₹${c.payout_amount} processed for Order #${c.order_id?.slice(0,6) || c.id.slice(0,6)}`, time: 'Recently', read: false })
+         if (c.status === 'declined') newNotifs.push({ text: `CLAIM DENIED: Security audit failed for Order #${c.order_id?.slice(0,6) || c.id.slice(0,6)}`, time: 'Recently', read: false })
+         if (c.status === 'pending' && c.trigger_event) newNotifs.push({ text: `AUTO-TRIGGER: Claims submitted for ${c.trigger_event}`, time: 'Live Event', read: false })
       })
       setNotifications(prev => {
         const existing = prev.map(p => p.text)
@@ -964,6 +1040,16 @@ export default function App() {
     }
   }
 
+  const handleAcceptQuote = async (quote_id) => {
+    try {
+      const res = await authFetch(`${API_BASE}/quotes/accept`, { method: 'POST', body: JSON.stringify({ quote_id }) })
+      const data = await res.json()
+      if (data.success) {
+        fetchAgentNotifications() // refresh worker state
+      }
+    } catch (e) { console.error(e) }
+  }
+
   useEffect(() => {
     if (role === 'admin') fetchAdminData()
     if (role === 'worker') fetchAgentNotifications()
@@ -971,7 +1057,7 @@ export default function App() {
     const interval = setInterval(() => {
        if (role === 'admin') fetchAdminData()
        if (role === 'worker') fetchAgentNotifications()
-       if (userMeta?.zone) fetchWeatherBackground(userMeta.zone)
+       if (userMeta?.base_location) fetchWeatherBackground(userMeta.base_location)
     }, 20000)
     
     return () => clearInterval(interval)
@@ -1006,8 +1092,8 @@ export default function App() {
           notifications={notifications}
         />
         <main className="flex-1 overflow-x-hidden pt-4 pb-12">
-          {activeTab === 'home' && role === 'worker' && <WorkerDashboard userMeta={userMeta} quote={quote} fetchQuote={fetchQuote} liveWeather={liveWeather} />}
-          {activeTab === 'policy' && role === 'worker' && <PolicyView userMeta={userMeta} quote={quote} />}
+          {activeTab === 'home' && role === 'worker' && <WorkerDashboard userMeta={userMeta} activePolicy={activePolicy} lifetimePayout={lifetimePayout} quote={quote} fetchQuote={fetchQuote} liveWeather={liveWeather} onAcceptQuote={handleAcceptQuote} />}
+          {activeTab === 'policy' && role === 'worker' && <PolicyView userMeta={userMeta} activePolicy={activePolicy} />}
           {activeTab === 'claims' && role === 'worker' && <ClaimsView userMeta={userMeta} liveWeather={liveWeather} />}
           {(activeTab === 'home' || activeTab === 'admin') && role === 'admin' && <AdminDashboard adminData={adminData} onUpdate={() => fetchAdminData()} />}
           {activeTab === 'profile' && <ProfileView userMeta={userMeta} userRole={role} onLogout={handleLogout} />}
