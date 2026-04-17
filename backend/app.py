@@ -459,9 +459,21 @@ def trigger_weather_claims():
         
         db.session.commit()
 
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=trigger_weather_claims, trigger="interval", seconds=60)
-scheduler.start()
+@app.route('/api/parametric/trigger', methods=['POST'])
+def trigger_parametric_check():
+    """Manual trigger for CRON jobs on Vercel"""
+    trigger_weather_claims()
+    return jsonify({"success": True, "message": "Parametric check completed."})
+
+# --- SCHEDULER: DISABLE ON VERCEL --- #
+
+if os.environ.get('VERCEL'):
+    print("DEBUG: Serverless mode detected. Background scheduler disabled. Use /api/parametric/trigger for cron tasks.")
+else:
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(func=trigger_weather_claims, trigger="interval", seconds=60)
+    scheduler.start()
+    print("DEBUG: Local environment detected. Background scheduler started (60s).")
 
 if __name__ == '__main__':
     # Use reloader=False to avoid scheduler double-firing

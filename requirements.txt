@@ -1,5 +1,12 @@
-Flask==3.0.2
-flask-cors==4.0.0
-flask-sqlalchemy==3.1.1
-requests==2.31.0
-werkzeug>=3.0.0
+flask
+flask-sqlalchemy
+flask-cors
+flask-jwt-extended
+requests
+pandas
+numpy
+scikit-learn
+apscheduler
+python-dotenv
+psycopg2-binary
+gunicorn
