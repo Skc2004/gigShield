@@ -135,9 +135,9 @@ const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
   ]
 
   return (
-    <div className="w-20 md:w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 shadow-2xl h-screen fixed left-0 top-0 z-50 shrink-0">
-        <div className="p-4 md:p-8 flex items-center mb-8 border-b border-slate-800/50 hidden md:flex">
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 mr-4">
+    <div className="bg-slate-900 text-slate-300 flex md:flex-col border-t md:border-t-0 md:border-r border-slate-800 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl fixed bottom-0 md:top-0 left-0 w-full md:w-64 h-20 md:h-screen z-[200] shrink-0 pb-safe">
+        <div className="p-4 md:p-8 items-center mb-8 border-b border-slate-800/50 hidden md:flex">
+          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 mr-4 shrink-0">
             <Shield className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -146,32 +146,32 @@ const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
           </div>
         </div>
         
-        <div className="md:hidden mt-4 flex justify-center pb-4 border-b border-slate-800/50">
-            <Shield className="w-8 h-8 text-emerald-500" />
-        </div>
-        
-        <nav className="flex-1 px-2 md:px-4 space-y-2 mt-4 md:mt-0">
+        <nav className="flex-1 flex md:flex-col px-2 md:px-4 space-x-2 md:space-x-0 md:space-y-2 w-full justify-around md:justify-start items-center md:items-stretch py-2 md:py-0">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center justify-center md:justify-start px-0 md:px-4 py-4 md:py-3.5 rounded-xl transition-all font-bold tracking-wide group content-center ${
-                activeTab === tab.id ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'hover:bg-slate-800/50 hover:text-white border border-transparent'
+              className={`flex flex-col md:flex-row items-center justify-center md:justify-start px-2 md:px-4 py-2 md:py-3.5 rounded-xl transition-all font-bold tracking-wide group content-center w-full max-w-[80px] md:max-w-full ${
+                activeTab === tab.id ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'hover:bg-slate-800/50 hover:text-white border border-transparent text-slate-500 md:text-slate-300'
               }`}
             >
-              <tab.icon className={`w-5 h-5 md:mr-3 transition-transform ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`} />
-              <span className="hidden md:inline">{tab.label}</span>
+              <tab.icon className={`w-6 h-6 md:w-5 md:h-5 md:mr-3 transition-transform mb-1 md:mb-0 ${activeTab === tab.id ? 'scale-110 text-emerald-400' : 'group-hover:scale-110 text-slate-400'}`} />
+              <span className="text-[10px] md:text-sm whitespace-nowrap block text-center md:text-left">{tab.label}</span>
             </button>
           ))}
+          <button onClick={onLogout} className="md:hidden flex flex-col items-center justify-center px-2 py-2 rounded-xl text-slate-500 hover:text-white transition-colors group w-full max-w-[80px]">
+            <LogOut className="w-6 h-6 mb-1 text-slate-400" />
+            <span className="text-[10px] block text-center">LogOut</span>
+          </button>
         </nav>
         
-        <div className="p-2 md:p-6 mt-auto border-t border-slate-800/50">
-          <div className="hidden md:block bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50 mb-4 text-center">
+        <div className="p-2 md:p-6 mt-auto border-t border-slate-800/50 hidden md:block">
+          <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50 mb-4 text-center">
             <div className="flex items-center justify-center text-xs font-bold text-emerald-400 mb-1"><Activity className="w-3 h-3 mr-1" /> SQL LIVE</div>
           </div>
-          <button onClick={onLogout} className="w-full flex items-center justify-center md:justify-start px-0 md:px-4 py-4 md:py-3 text-slate-400 hover:text-white transition-colors group">
-            <LogOut className="w-5 h-5 md:mr-3 group-hover:-translate-x-1 transition-transform" />
-            <span className="hidden md:inline font-bold">LogOut</span>
+          <button onClick={onLogout} className="w-full flex items-center justify-start px-4 py-3 text-slate-400 hover:text-white transition-colors group">
+            <LogOut className="w-5 h-5 mr-3 group-hover:-translate-x-1 transition-transform" />
+            <span className="font-bold">LogOut</span>
           </button>
         </div>
     </div>
@@ -451,13 +451,42 @@ const LandingPage = ({ onLogin }) => {
   )
 }
 
-const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
+const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather, installPrompt }) => {
   useEffect(() => {
     if (!quote && userMeta) fetchQuote(userMeta.zone, userMeta.platform, userMeta.phone)
   }, [])
 
+  const handleInstallClick = () => {
+    if (installPrompt) {
+        installPrompt.prompt()
+        installPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted the install prompt')
+            } else {
+                console.log('User dismissed the install prompt')
+            }
+        })
+    }
+  }
+
   return (
-    <div className="p-8 max-w-[1200px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
+    <div className="p-4 md:p-8 max-w-[1200px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      {installPrompt && (
+        <div className="bg-gradient-to-r from-sky-500 to-indigo-600 rounded-2xl p-4 md:p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between border border-sky-400 gap-4 relative overflow-hidden">
+            <div className="absolute top-[-50%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-[40px] pointer-events-none"></div>
+            <div className="flex items-center">
+                <Smartphone className="w-8 h-8 md:w-10 md:h-10 text-white mr-4 shrink-0" />
+                <div>
+                    <h3 className="font-black text-lg">Install GigShield App</h3>
+                    <p className="text-[10px] md:text-xs font-medium text-sky-100">Add to your Home Screen for offline maps and faster claims.</p>
+                </div>
+            </div>
+            <button onClick={handleInstallClick} className="w-full md:w-auto bg-white text-indigo-700 font-bold px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors whitespace-nowrap shadow-sm active:scale-95">
+                Install App Now
+            </button>
+        </div>
+      )}
+      
       <div className="bg-emerald-700/95 backdrop-blur-xl rounded-[2rem] p-8 text-white relative overflow-hidden shadow-xl shadow-emerald-700/20 border border-emerald-600">
         <div className="absolute right-0 top-0 w-[400px] h-[400px] bg-emerald-500 rounded-full blur-[80px] opacity-40 translate-x-1/2 -translate-y-1/3 pointer-events-none"></div>
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -1096,15 +1125,25 @@ const PolicyView = ({ userMeta, quote }) => {
   )
 }
 
-export default function App() {
-  const [role, setRole] = useState(null)
+const App = () => {
   const [activeTab, setActiveTab] = useState('home')
-  const [userMeta, setUserMeta] = useState(null) // { phone, zone, platform, id }
-  const [quote, setQuote] = useState(null)
+  const [userMeta, setUserMeta] = useState({ phone: '', name: '', zone: '', role: '' })
   const [adminData, setAdminData] = useState(null)
+  const [quote, setQuote] = useState(null)
+  const [role, setRole] = useState('')
   const [liveWeather, setLiveWeather] = useState(null)
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [notifications, setNotifications] = useState([])
+  const [installPrompt, setInstallPrompt] = useState(null)
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+    }
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  }, [])
 
   const fetchWeatherBackground = async (zone) => {
     try {
@@ -1213,7 +1252,7 @@ export default function App() {
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       <LiveBackground />
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={role} onLogout={handleLogout} userMeta={userMeta} />
-      <div className="flex-1 ml-64 flex flex-col h-screen overflow-y-auto relative z-10 selection:bg-emerald-200">
+      <div className="flex-1 ml-0 md:ml-64 flex flex-col h-screen overflow-y-auto relative z-10 selection:bg-emerald-200">
         <Header 
           title={getPageTitle()} 
           userRole={role} 
@@ -1222,8 +1261,8 @@ export default function App() {
           onOpenAnalytics={() => setShowAnalytics(true)}
           notifications={notifications}
         />
-        <main className="flex-1 overflow-x-hidden pt-4 pb-12">
-          {activeTab === 'home' && role === 'worker' && <WorkerDashboard userMeta={userMeta} quote={quote} fetchQuote={fetchQuote} liveWeather={liveWeather} />}
+        <main className="flex-1 overflow-x-hidden pt-4 pb-32 md:pb-12 px-2 md:px-0">
+          {activeTab === 'home' && role === 'worker' && <WorkerDashboard userMeta={userMeta} quote={quote} fetchQuote={fetchQuote} liveWeather={liveWeather} installPrompt={installPrompt} />}
           {activeTab === 'policy' && role === 'worker' && <PolicyView userMeta={userMeta} quote={quote} />}
           {activeTab === 'claims' && role === 'worker' && <ClaimsView userMeta={userMeta} liveWeather={liveWeather} />}
           {(activeTab === 'home' || activeTab === 'admin') && role === 'admin' && <AdminDashboard adminData={adminData} onUpdate={() => fetchAdminData()} />}
@@ -1240,3 +1279,5 @@ export default function App() {
     </div>
   )
 }
+
+export default App;
