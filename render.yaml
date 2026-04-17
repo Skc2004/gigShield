@@ -8,8 +8,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.10.12
       - key: DATABASE_URL
-        value: sqlite:////opt/render/project/src/backend/data/gigshield_production.db
-    disk:
-      name: gigshield-data
-      mountPath: /opt/render/project/src/backend/data
-      sizeGB: 1
+        sync: false
