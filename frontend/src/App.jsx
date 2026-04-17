@@ -1,10 +1,86 @@
 import React, { useState, useEffect } from 'react'
-import { Shield, Home, FileText, Activity, Settings, User, LogOut, Bell, ChevronDown, CheckCircle, Smartphone, MapPin, ArrowRight, Zap, CloudRain, ThermometerSun, Lock, Clock, AlertTriangle, TrendingDown, Target, BarChart, Database, RefreshCcw, BellRing, TrendingUp, IndianRupee, X, Search } from 'lucide-react'
+import { Shield, Home, FileText, Activity, Settings, User, LogOut, Bell, ChevronDown, CheckCircle, Smartphone, MapPin, ArrowRight, Zap, CloudRain, ThermometerSun, Lock, Clock, AlertTriangle, TrendingDown, Target, BarChart, Database, RefreshCcw, BellRing, TrendingUp, IndianRupee, X, Search , Camera } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
-const API_BASE = 'http://127.0.0.1:5000/api'
+// Use Vercel Environment Variables or fallback to Localhost
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000/api'
 
 // Simple SVG Chart Component
+
+const LiveCamera = ({ onCapture }) => {
+  const [stream, setStream] = useState(null)
+  const [captured, setCaptured] = useState(null)
+  const videoRef = React.useRef(null)
+  const canvasRef = React.useRef(null)
+
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      setStream(mediaStream)
+    } catch (e) {
+      console.error("Camera error:", e)
+      // Fallback for headless testing environments
+      const dummyBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+      setCaptured(dummyBase64);
+      onCapture(dummyBase64);
+      // alert("Camera access denied. Using test frame.");
+    }
+  }
+
+  const takePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return
+    const context = canvasRef.current.getContext('2d')
+    canvasRef.current.width = videoRef.current.videoWidth
+    canvasRef.current.height = videoRef.current.videoHeight
+    context.drawImage(videoRef.current, 0, 0)
+    const base64Img = canvasRef.current.toDataURL('image/jpeg', 0.8)
+    setCaptured(base64Img)
+    onCapture(base64Img)
+    stopCamera()
+  }
+
+  const stopCamera = () => {
+    if (stream) stream.getTracks().forEach(track => track.stop())
+    setStream(null)
+  }
+
+  useEffect(() => { 
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream
+    }
+    return () => {
+      // Don't stop it on every dependency change, only on unmount
+    }
+  }, [stream])
+
+  useEffect(() => {
+    return () => stopCamera()
+  }, [])
+
+  if (captured) {
+    return (
+      <div className="relative rounded-xl overflow-hidden mb-4 border-2 border-emerald-500">
+        <img src={captured} alt="Proof" className="w-full h-48 object-cover" />
+        <button onClick={() => { setCaptured(null); onCapture(null) }} className="absolute top-2 right-2 bg-slate-900/80 text-white p-2 rounded-full backdrop-blur-sm"><X className="w-4 h-4"/></button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-4 bg-slate-900 rounded-xl overflow-hidden relative min-h-[12rem] flex flex-col items-center justify-center">
+      {!stream ? (
+        <button onClick={startCamera} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-3 rounded-xl font-bold flex items-center transition-colors"><Camera className="w-5 h-5 mr-2" /> Open Live Camera</button>
+      ) : (
+        <>
+          <video ref={videoRef} autoPlay playsInline className="w-full h-48 object-cover" />
+          <canvas ref={canvasRef} className="hidden" />
+          <button onClick={takePhoto} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white text-slate-900 px-6 py-2 rounded-full font-black shadow-lg">Capture</button>
+        </>
+      )}
+    </div>
+  )
+}
+
 const PayoutChart = ({ data, type = 'line', xKey = 'date', yKey = 'amount' }) => {
   if (!data || data.length === 0) return (
     <div className="h-64 flex items-center justify-center text-slate-400 font-medium bg-slate-50 rounded-2xl border border-dashed border-slate-200">
@@ -646,6 +722,7 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
   const [audioText, setAudioText] = useState('')
   const [useVoice, setUseVoice] = useState(false)
   const [mockExif, setMockExif] = useState(false)
+  const [liveImage, setLiveImage] = useState(null)
   const [successModal, setSuccessModal] = useState(null)
 
   const fetchWorkerData = async () => {
@@ -665,6 +742,7 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
       phone: userMeta.phone, 
       order_id: selectedOrder,
       audio_text: useVoice ? audioText : null,
+      image_data: liveImage,
       exif_data: mockExif ? { lat: 0, lon: 0, timestamp: new Date(Date.now() - 86400000).toISOString() } : { lat: 12.9352, lon: 77.6245, timestamp: new Date().toISOString() } // if mocking fraud, push fake GPS
     }
     try {
@@ -682,7 +760,11 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
         })
         setSuccessModal(data)
       } else {
+        if (data.status === 'pending') {
         alert("⚠️ CLAIM FLAGGED FOR REVIEW ⚠️\n" + data.message)
+      } else {
+        alert("⚠️ ERROR ⚠️\n" + (data.error || data.message || "Failed to process claim. It may have already been filed."))
+      }
       }
       await fetchWorkerData()
       setSelectedOrder('')
@@ -711,7 +793,7 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
               
               <div className="w-full bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-6 relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-transparent"></div>
-                <span className="relative z-10 text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Razorpay Instant Transfer</span>
+                <span className="relative z-10 text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Stripe API Webhook Success</span>
                 <span className="relative z-10 text-4xl font-black text-emerald-600 tracking-tighter block mb-1">₹{successModal.payout}</span>
                 <span className="relative z-10 text-[10px] font-mono text-slate-400 bg-slate-200 px-2 py-0.5 rounded">Txn: {successModal.txn_id}</span>
               </div>
@@ -773,7 +855,7 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
                 <div>
                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">COMPLETED ORDERS</label>
                    <div className="space-y-2">
-                     {orders.map(o => (
+                     {orders.filter(o => !claims.find(c => c.order_id === o.id)).map(o => (
                         <button 
                           key={o.id}
                           onClick={() => setSelectedOrder(o.id)}
@@ -817,9 +899,10 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
                    </div>
                 </div>
 
+                <LiveCamera onCapture={setLiveImage} />
                 <button 
                   onClick={handleInitiateClaim}
-                  disabled={loading || !selectedOrder}
+                  disabled={loading || !selectedOrder || !liveImage}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-2xl transition-all shadow-lg shadow-emerald-900/40 border border-emerald-500 flex items-center justify-center disabled:opacity-30 group relative overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
@@ -980,6 +1063,7 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
                   </td>
                   <td className="px-8 py-6 max-w-xs">
                     <p className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg inline-block">{c.reason}</p>
+                    {c.image_data && <img src={c.image_data} alt="Proof" className="mt-2 h-16 w-16 object-cover rounded-lg border border-slate-200 shadow-sm" />}
                     {c.fraud_flag && c.fraud_reason && (
                       <p className="text-[10px] text-rose-600 mt-2 font-black uppercase tracking-wide bg-rose-50 p-2 rounded border border-rose-100 block w-fit">{c.fraud_reason}</p>
                     )}

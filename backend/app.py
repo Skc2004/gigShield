@@ -18,7 +18,7 @@ app = Flask(__name__)
 CORS(app)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'gigshield_production.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'gigshield_production.db'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Production FinTech Keys
@@ -261,6 +261,7 @@ def initiate_claim():
     weather_override = data.get('simulated_weather', None) 
     exif_data = data.get('exif_data', None)
     audio_text = data.get('audio_text', None)
+    image_data = data.get('image_data', None)
     
     user = User.query.filter_by(phone=phone).first()
     if not user: return jsonify({"error": "User not found"}), 404
@@ -341,7 +342,8 @@ def initiate_claim():
         audio_transcript=audio_text,
         exif_lat=exif_data.get('lat') if exif_data else None,
         exif_lon=exif_data.get('lon') if exif_data else None,
-        exif_timestamp=exif_data.get('timestamp') if exif_data else None
+        exif_timestamp=exif_data.get('timestamp') if exif_data else None,
+        image_data=image_data
     )
     db.session.add(new_claim)
     db.session.commit()
@@ -377,7 +379,8 @@ def manager_dashboard():
             "phone": c.phone, "amount": c.amount, "status": c.status,
             "reason": c.reason, "order_id": c.order_id, "timestamp": c.timestamp,
             "fraud_flag": c.fraud_flag, "fraud_reason": c.fraud_reason,
-            "confidence_score": c.confidence_score
+            "confidence_score": c.confidence_score,
+            "image_data": c.image_data
         } for c in claims],
         'metrics': {
             'active_policies': active_policies,

@@ -61,3 +61,4 @@ class Claim(db.Model):
     fraud_reason = db.Column(db.String(500), nullable=True)
     confidence_score = db.Column(db.Float, default=100.0)
     audio_transcript = db.Column(db.Text, nullable=True)
+    image_data = db.Column(db.Text, nullable=True)
