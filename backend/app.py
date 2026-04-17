@@ -11,6 +11,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.cluster import KMeans
 from models import db, User, Policy, Claim, Order
+from fraud_detection import perform_ela_check, verify_exif_data, process_voice_claim
 
 app = Flask(__name__)
 CORS(app)
@@ -148,9 +149,20 @@ def get_quote():
     traffic_index = np.random.uniform(4, 9)
     input_features = pd.DataFrame([[current_temp, rain_mm, traffic_index]], columns=['temp', 'rain', 'traffic'])
     prediction = pm.predict(input_features)[0]
-    weekly_premium = round(prediction, 2)
+    base_premium = round(prediction, 2)
     
+    # Dynamic Premium Adjustment based on claims history
     user = User.query.filter_by(phone=phone).first()
+    historical_claims_count = 0
+    multiplier = 1.0
+    if user and user.role == 'agent':
+        historical_claims = Claim.query.filter_by(user_id=user.id).all()
+        historical_claims_count = len(historical_claims)
+        # Increase premium by 5% per historical claim
+        multiplier = 1.0 + (historical_claims_count * 0.05)
+    
+    weekly_premium = round(base_premium * multiplier, 2)
+    
     if user and user.role == 'agent':
         policy = Policy.query.filter_by(phone=phone).first()
         if not policy:
@@ -168,6 +180,8 @@ def get_quote():
     return jsonify({
         'zone': zone,
         'weekly_premium': weekly_premium,
+        'base_premium': base_premium,
+        'multiplier': multiplier,
         'currency': 'INR',
         'risk_factors': {'temp': current_temp, 'rain_mm': rain_mm, 'traffic': round(traffic_index, 1), 'high_risk': is_high_risk}
     })
@@ -211,7 +225,10 @@ def initiate_claim():
     data = request.json
     phone = data.get('phone')
     order_id = data.get('order_id')
-    weather_override = data.get('simulated_weather', None) # allow forcing weather for testing
+    # Extract fields for WoW features
+    weather_override = data.get('simulated_weather', None) 
+    exif_data = data.get('exif_data', None)
+    audio_text = data.get('audio_text', None)
     
     user = User.query.filter_by(phone=phone).first()
     if not user: return jsonify({"error": "User not found"}), 404
@@ -220,43 +237,80 @@ def initiate_claim():
     if not order or order.user_id != user.id:
         return jsonify({"error": "Invalid order ID"}), 400
 
-    # Avoid duplicate claims for same order
+    # Avoid duplicate claims
     existing = Claim.query.filter_by(order_id=order.id).first()
-    if existing: return jsonify({"error": "Claim already filed for this order"}), 400
+    if existing: return jsonify({"error": "Claim already filed"}), 400
 
     lat, lon = ZONES.get(user.zone, ZONES['Koramangala, BLR'])
     curr_t, rain_mm, _, _ = fetch_live_weather(lat, lon)
     
-    # Simple threshold logic:
-    if weather_override == 'rain' or rain_mm > 0:
+    # NLP Context-Aware Extraction
+    extracted_intent = process_voice_claim(audio_text) if audio_text else ""
+    
+    if weather_override == 'rain' or rain_mm > 0 or extracted_intent == 'rain':
         weather_cond = 'rain'
         base_payout = 100
-    elif weather_override == 'heat' or curr_t > 38:
+    elif weather_override == 'heat' or curr_t > 38 or extracted_intent == 'heat':
         weather_cond = 'heat'
         base_payout = 150
     else:
-        # Fuzz to rain for testing if they didn't provide override and weather is normal
         weather_cond = 'rain'
         base_payout = 100
 
-    # Add distance multiplier (e.g., 10 INR per km)
     distance_bonus = order.distance_km * 10
     payout_amount = round(base_payout + distance_bonus, 2)
     
+    # Track 1: AI Engine Fraud Checks
+    fraud_flagged = False
+    fraud_reasons = []
+    
+    # 1. ELA Check (10% random logic handled in func)
+    is_ela_tampered, ela_score = perform_ela_check(None)
+    if is_ela_tampered:
+        fraud_flagged = True
+        fraud_reasons.append(f"Image Tampered (ELA Score: {ela_score})")
+        
+    # 2. EXIF Spoofing check
+    is_spoofed, spoof_reason = verify_exif_data(exif_data, lat, lon)
+    if is_spoofed:
+        fraud_flagged = True
+        fraud_reasons.append(spoof_reason)
+        
+    final_fraud_reason = " | ".join(fraud_reasons) if fraud_reasons else None
+    
+    # Automated Approval Logic (Track 2 Gateway Integration)
+    status = 'approved' if not fraud_flagged else 'pending'
+    txn_id = f"pi_test_{uuid.uuid4().hex[:12]}" if status == 'approved' else None
+
     new_claim = Claim(
         user_id=user.id,
         order_id=order.id,
         phone=phone,
-        status='pending',
-        reason=f'{weather_cond.capitalize()} conditions detected. Route: {order.distance_km}km',
+        status=status,
+        reason=f'{weather_cond.capitalize()} conditions detected. Intent: {extracted_intent}. Route: {order.distance_km}km',
         weather_condition=weather_cond,
         amount=payout_amount,
-        txn_id=None
+        txn_id=txn_id,
+        fraud_flag=fraud_flagged,
+        fraud_reason=final_fraud_reason,
+        audio_transcript=audio_text,
+        exif_lat=exif_data.get('lat') if exif_data else None,
+        exif_lon=exif_data.get('lon') if exif_data else None,
+        exif_timestamp=exif_data.get('timestamp') if exif_data else None
     )
     db.session.add(new_claim)
     db.session.commit()
     
-    return jsonify({'status': 'pending', 'claim_id': new_claim.id, 'payout': payout_amount})
+    # If approved instantly, simulate Stripe/Razorpay automated webhook triggering
+    # In a real system, the webhook would hit an endpoint. We just return the sync success here.
+    return jsonify({
+        'status': status, 
+        'claim_id': new_claim.id, 
+        'payout': payout_amount,
+        'fraud_flagged': fraud_flagged,
+        'txn_id': txn_id,
+        'message': 'Payout Instant Approval!' if status == 'approved' else 'Claim sent for manual review due to fraud checks.'
+    })
 
 @app.route('/api/manager/dashboard', methods=['GET'])
 def manager_dashboard():
@@ -275,7 +329,8 @@ def manager_dashboard():
         'claims': [{
             "id": c.id, "agent_name": c.user.name if c.user else "Unknown",
             "phone": c.phone, "amount": c.amount, "status": c.status,
-            "reason": c.reason, "order_id": c.order_id, "timestamp": c.timestamp
+            "reason": c.reason, "order_id": c.order_id, "timestamp": c.timestamp,
+            "fraud_flag": c.fraud_flag, "fraud_reason": c.fraud_reason
         } for c in claims],
         'metrics': {
             'active_policies': active_policies,

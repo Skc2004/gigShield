@@ -575,6 +575,9 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
   const [claims, setClaims] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState('')
+  const [audioText, setAudioText] = useState('')
+  const [useVoice, setUseVoice] = useState(false)
+  const [mockExif, setMockExif] = useState(false)
 
   const fetchWorkerData = async () => {
     try {
@@ -588,13 +591,28 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
   const handleInitiateClaim = async () => {
     if (!selectedOrder) return
     setLoading(true)
+    const payload = { 
+      phone: userMeta.phone, 
+      order_id: selectedOrder,
+      audio_text: useVoice ? audioText : null,
+      exif_data: mockExif ? { lat: 0, lon: 0, timestamp: new Date(Date.now() - 86400000).toISOString() } : { lat: 12.9352, lon: 77.6245, timestamp: new Date().toISOString() } // if mocking fraud, push fake GPS
+    }
     try {
-      await fetch(`${API_BASE}/claims/initiate`, {
+      const res = await fetch(`${API_BASE}/claims/initiate`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: userMeta.phone, order_id: selectedOrder })
+        body: JSON.stringify(payload)
       })
+      const data = await res.json()
+      if (data.status === 'approved') {
+        alert("💰 INSTANT PAYOUT APPROVED! 💰\nTxn: " + data.txn_id)
+      } else {
+        alert("⚠️ CLAIM FLAGGED FOR REVIEW ⚠️\n" + data.message)
+      }
       await fetchWorkerData()
       setSelectedOrder('')
+      setAudioText('')
+      setUseVoice(false)
+      setMockExif(false)
     } finally { setLoading(false) }
   }
 
@@ -664,18 +682,102 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
                    </div>
                 </div>
 
+                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700">
+                   <div className="flex items-center justify-between mb-4">
+                     <label className="text-[9px] font-black text-emerald-400 uppercase tracking-widest flex items-center"><Smartphone className="w-3 h-3 mr-1" /> VOICE / NLP CLAIM</label>
+                     <input type="checkbox" checked={useVoice} onChange={(e) => setUseVoice(e.target.checked)} className="accent-emerald-500" />
+                   </div>
+                   {useVoice && (
+                     <div className="animate-in fade-in slide-in-from-top-2">
+                       <textarea 
+                         value={audioText} 
+                         onChange={(e) => setAudioText(e.target.value)}
+                         placeholder="Simulate speech to text... e.g., 'I am stuck in heavy rain'"
+                         className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                         rows="2"
+                       />
+                       <div className="flex space-x-2 mt-2">
+                         <button onClick={() => setAudioText("It's pouring rain and I can't move.")} className="text-[9px] bg-blue-500/20 text-blue-300 px-2 py-1 rounded">Simulate Rain</button>
+                         <button onClick={() => setAudioText("Stuck in traffic accident zone")} className="text-[9px] bg-amber-500/20 text-amber-300 px-2 py-1 rounded">Simulate Traffic</button>
+                       </div>
+                     </div>
+                   )}
+                </div>
+
+                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700">
+                   <div className="flex items-center justify-between">
+                     <label className="text-[9px] font-black text-rose-400 uppercase tracking-widest flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> SIMULATE FRAUD (EXIF TAMPERING)</label>
+                     <input type="checkbox" checked={mockExif} onChange={(e) => setMockExif(e.target.checked)} className="accent-rose-500" />
+                   </div>
+                </div>
+
                 <button 
                   onClick={handleInitiateClaim}
                   disabled={loading || !selectedOrder}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-2xl transition-all shadow-lg shadow-emerald-900/40 border border-emerald-500 flex items-center justify-center disabled:opacity-30 group"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-2xl transition-all shadow-lg shadow-emerald-900/40 border border-emerald-500 flex items-center justify-center disabled:opacity-30 group relative overflow-hidden"
                 >
-                  {loading ? <RefreshCcw className="w-6 h-6 animate-spin" /> : (
-                    <><Zap className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" /> <span>Verify Payout</span></>
+                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+                  {loading ? <RefreshCcw className="w-6 h-6 animate-spin relative z-10" /> : (
+                    <span className="relative z-10 flex items-center"><Zap className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" /> <span className="tracking-wide">AI VERIFY & PAYOUT</span></span>
                   )}
                 </button>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const DigitalTwinMap = () => {
+  // Simulating a stylized grid representing localized weather/traffic systems in the city
+  const gridCells = Array.from({length: 64}).map((_, i) => ({
+    id: i,
+    risk: Math.random() > 0.8 ? 'high' : Math.random() > 0.5 ? 'medium' : 'low'
+  }))
+
+  return (
+    <div className="bg-slate-900 rounded-[2.5rem] p-8 mt-8 border border-slate-800 relative overflow-hidden group">
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
+      <div className="absolute -top-40 -right-40 w-80 h-80 bg-red-500/10 blur-[100px] rounded-full"></div>
+      
+      <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center">
+        <div className="flex-1">
+          <span className="bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full inline-flex items-center mb-4">
+            <Activity className="w-3 h-3 mr-2 animate-pulse" /> LIVE DIGITAL TWIN
+          </span>
+          <h3 className="text-3xl font-black text-white tracking-tighter mb-4">Predictive Risk Matrix</h3>
+          <p className="text-slate-400 font-medium text-sm leading-relaxed mb-6">Real-time geospatial ingestion across operational zones. Highlighting hyper-local climatic shifts and traffic density to forecast payout concentrations before they occur.</p>
+          
+          <div className="flex space-x-4">
+            <div className="flex items-center space-x-2 text-xs font-bold text-slate-300">
+              <div className="w-3 h-3 rounded-sm bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" /> <span>Severe Claim Risk</span>
+            </div>
+            <div className="flex items-center space-x-2 text-xs font-bold text-slate-300">
+              <div className="w-3 h-3 rounded-sm bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]" /> <span>Elevated</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="w-72 h-72 shrink-0 relative bg-slate-950 rounded-2xl border border-slate-800 p-2 shadow-2xl">
+           <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:1rem_1rem] opacity-20"></div>
+           <div className="grid grid-cols-8 grid-rows-8 gap-0.5 w-full h-full p-2 relative z-10">
+              {gridCells.map(cell => (
+                <div 
+                  key={cell.id} 
+                  className={`rounded-[2px] transition-all duration-[2000ms] ease-in-out ${
+                    cell.risk === 'high' ? 'bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse' : 
+                    cell.risk === 'medium' ? 'bg-amber-500/40 hover:bg-amber-500/60' : 
+                    'bg-slate-800/40 hover:bg-slate-600/60'
+                  }`}
+                />
+              ))}
+           </div>
+           
+           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-sky-400 bg-sky-500/20 flex items-center justify-center z-20">
+             <div className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-ping"></div>
+           </div>
         </div>
       </div>
     </div>
@@ -741,9 +843,17 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
                   <td className="px-8 py-6">
                     <p className="font-black text-slate-800 text-sm">{c.agent_name}</p>
                     <p className="text-xs text-slate-400 font-mono">+91 {c.phone} • Order #{c.order_id.slice(0,8)}</p>
+                    {c.fraud_flag && (
+                      <span className="mt-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 tracking-wider">
+                        <AlertTriangle className="w-3 h-3 mr-1" /> EXIF FRAUD DETECTED
+                      </span>
+                    )}
                   </td>
                   <td className="px-8 py-6 max-w-xs">
                     <p className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg inline-block">{c.reason}</p>
+                    {c.fraud_flag && c.fraud_reason && (
+                      <p className="text-[10px] text-rose-600 mt-2 font-black uppercase tracking-wide bg-rose-50 p-2 rounded border border-rose-100">{c.fraud_reason}</p>
+                    )}
                     <p className="text-[10px] text-slate-400 mt-2 font-bold">{c.timestamp.replace('T', ' ').slice(0,16)}</p>
                   </td>
                   <td className="px-8 py-6 text-right font-black text-lg text-slate-800 tracking-tighter">
@@ -780,6 +890,8 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
           </table>
         </div>
       </div>
+      
+      <DigitalTwinMap />
     </div>
   )
 }

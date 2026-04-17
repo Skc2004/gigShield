@@ -52,3 +52,12 @@ class Claim(db.Model):
     amount = db.Column(db.Float, nullable=False)
     txn_id = db.Column(db.String(100), nullable=True)
     timestamp = db.Column(db.String(50), default=lambda: datetime.now().isoformat())
+    
+    # New Fields for Fraud Detection & Audit
+    exif_lat = db.Column(db.Float, nullable=True)
+    exif_lon = db.Column(db.Float, nullable=True)
+    exif_timestamp = db.Column(db.String(50), nullable=True)
+    fraud_flag = db.Column(db.Boolean, default=False)
+    fraud_reason = db.Column(db.String(255), nullable=True)
+    audio_transcript = db.Column(db.Text, nullable=True)
+
