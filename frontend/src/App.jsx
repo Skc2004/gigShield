@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Shield, Home, FileText, Activity, Settings, User, LogOut, Bell, ChevronDown, CheckCircle, Smartphone, MapPin, ArrowRight, Zap, CloudRain, ThermometerSun, Lock, Clock, AlertTriangle, TrendingDown, Target, BarChart, Database, RefreshCcw, BellRing, TrendingUp, IndianRupee, X } from 'lucide-react'
+import { Shield, Home, FileText, Activity, Settings, User, LogOut, Bell, ChevronDown, CheckCircle, Smartphone, MapPin, ArrowRight, Zap, CloudRain, ThermometerSun, Lock, Clock, AlertTriangle, TrendingDown, Target, BarChart, Database, RefreshCcw, BellRing, TrendingUp, IndianRupee, X, Search } from 'lucide-react'
+import confetti from 'canvas-confetti'
 
 const API_BASE = 'http://127.0.0.1:5000/api'
 
@@ -125,7 +126,6 @@ const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
   const tabs = [
     { id: 'home', label: userRole === 'admin' ? 'Dashboard' : 'Home', icon: Home },
     ...(userRole === 'worker' ? [
-      { id: 'policy', label: 'Policy Details', icon: FileText },
       { id: 'claims', label: 'Insurance Feed', icon: Activity }
     ] : []),
     ...(userRole === 'admin' ? [
@@ -135,42 +135,45 @@ const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
   ]
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen fixed left-0 top-0 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-      <div className="p-6">
-        <div className="flex items-center space-x-2">
-          <Shield className="w-8 h-8 text-emerald-700" />
+    <div className="w-20 md:w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 shadow-2xl h-screen fixed left-0 top-0 z-50 shrink-0">
+        <div className="p-4 md:p-8 flex items-center mb-8 border-b border-slate-800/50 hidden md:flex">
+          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 mr-4">
+            <Shield className="w-6 h-6 text-white" />
+          </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-800 leading-none">GigShield</h1>
+            <h1 className="text-xl font-bold text-white leading-none">GigShield</h1>
             <p className="text-[10px] text-slate-500 mt-1">The Resilient Guardian</p>
           </div>
         </div>
-      </div>
-      <nav className="flex-1 px-4 py-6 space-y-2">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === tab.id ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
-          >
-            <tab.icon className="w-5 h-5" />
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="p-4 border-t border-slate-100 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-800 font-bold uppercase">
-            {userRole === 'admin' ? 'AD' : userMeta?.phone?.slice(-2) || 'WK'}
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-800">{userRole === 'admin' ? 'System Admin' : `+91 ******${userMeta?.phone?.slice(-4) || '0000'}`}</p>
-            <p className="text-xs text-emerald-600 font-bold capitalize">{userRole}</p>
-          </div>
+        
+        <div className="md:hidden mt-4 flex justify-center pb-4 border-b border-slate-800/50">
+            <Shield className="w-8 h-8 text-emerald-500" />
         </div>
-        <button onClick={onLogout} className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50">
-          <LogOut className="w-5 h-5" />
-        </button>
-      </div>
+        
+        <nav className="flex-1 px-2 md:px-4 space-y-2 mt-4 md:mt-0">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center justify-center md:justify-start px-0 md:px-4 py-4 md:py-3.5 rounded-xl transition-all font-bold tracking-wide group content-center ${
+                activeTab === tab.id ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'hover:bg-slate-800/50 hover:text-white border border-transparent'
+              }`}
+            >
+              <tab.icon className={`w-5 h-5 md:mr-3 transition-transform ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`} />
+              <span className="hidden md:inline">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+        
+        <div className="p-2 md:p-6 mt-auto border-t border-slate-800/50">
+          <div className="hidden md:block bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50 mb-4 text-center">
+            <div className="flex items-center justify-center text-xs font-bold text-emerald-400 mb-1"><Activity className="w-3 h-3 mr-1" /> SQL LIVE</div>
+          </div>
+          <button onClick={onLogout} className="w-full flex items-center justify-center md:justify-start px-0 md:px-4 py-4 md:py-3 text-slate-400 hover:text-white transition-colors group">
+            <LogOut className="w-5 h-5 md:mr-3 group-hover:-translate-x-1 transition-transform" />
+            <span className="hidden md:inline font-bold">LogOut</span>
+          </button>
+        </div>
     </div>
   )
 }
@@ -450,20 +453,27 @@ const LandingPage = ({ onLogin }) => {
 
 const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
   useEffect(() => {
-    if (!quote) fetchQuote(userMeta.zone, userMeta.platform, userMeta.phone)
+    if (!quote && userMeta) fetchQuote(userMeta.zone, userMeta.platform, userMeta.phone)
   }, [])
 
   return (
     <div className="p-8 max-w-[1200px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="bg-emerald-700/95 backdrop-blur-xl rounded-[2rem] p-8 text-white relative overflow-hidden shadow-xl shadow-emerald-700/20 border border-emerald-600">
         <div className="absolute right-0 top-0 w-[400px] h-[400px] bg-emerald-500 rounded-full blur-[80px] opacity-40 translate-x-1/2 -translate-y-1/3 pointer-events-none"></div>
-        <div className="relative z-10 flex items-center justify-between">
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div>
-            <span className="bg-white/10 border border-white/20 backdrop-blur text-white text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-full inline-flex items-center mb-4 shadow-sm">
-              <Shield className="w-3 h-3 mr-1.5 text-emerald-300" /> LIVE SQL RECORD: ACTIVE
-            </span>
+            <div className="flex space-x-3 mb-4">
+              <span className="bg-white/10 border border-white/20 backdrop-blur text-white text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-full shadow-sm">
+                <Shield className="w-3 h-3 mr-1.5 inline text-emerald-300" /> LIVE SQL RECORD: ACTIVE
+              </span>
+              {(quote?.trust_score >= 90) && (
+                <span className="bg-amber-400 text-amber-900 border border-amber-300 text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-full shadow-sm animate-pulse">
+                  ⭐ SAFE RIDER MULTIPLIER UNLOCKED
+                </span>
+              )}
+            </div>
             <h2 className="text-5xl md:text-6xl font-black tracking-tighter mb-2 text-white drop-shadow-sm">STATUS: COVERED</h2>
-            <p className="text-emerald-100/80 font-medium font-mono text-sm tracking-wide">Policy #GS-{userMeta.phone.slice(-4)}-{userMeta.zone.slice(0,3).toUpperCase()} • Active since 06:00 AM</p>
+            <p className="text-emerald-100/80 font-medium font-mono text-sm tracking-wide">Policy #GS-{userMeta?.phone?.slice(-4)}-{userMeta?.zone?.slice(0,3).toUpperCase()} • Active since 06:00 AM</p>
           </div>
           <div className="hidden lg:flex w-32 h-32 bg-emerald-600/50 backdrop-blur border border-emerald-500/50 rounded-[2rem] items-center justify-center transform rotate-6 shadow-2xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-tr from-emerald-800 to-transparent"></div>
@@ -485,7 +495,7 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
             <p className="text-5xl md:text-7xl font-black text-slate-800 tracking-tighter">₹8,500</p>
             <div className="flex justify-between items-center mt-6 pt-6 border-t border-slate-100">
               <div className="flex items-center text-xs font-bold text-slate-500">
-                <Smartphone className="w-4 h-4 mr-2 text-emerald-600" /> Linked to {userMeta.platform} UPI
+                <Smartphone className="w-4 h-4 mr-2 text-emerald-600" /> Linked to {userMeta?.platform} UPI
               </div>
             </div>
           </div>
@@ -503,7 +513,7 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
               <span className="text-slate-500 font-bold">/wk</span>
             </div>
           </div>
-          <div className="mt-8 relative z-10 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+          <div className="mt-8 relative z-10 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 mb-4">
             <div className="flex justify-between text-[10px] text-slate-300 font-black uppercase tracking-widest mb-3">
               <span>Auto-Debit Status</span>
               <span className="text-emerald-400">100% Active</span>
@@ -512,6 +522,35 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
               <div className="w-full h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
             </div>
           </div>
+          
+          <div className="relative z-10 bg-slate-800/80 p-5 rounded-2xl border border-slate-700">
+             <div className="flex justify-between items-center mb-3">
+                 <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Driver Retention Gamification</span>
+                    <span className="text-sm font-black text-white">Trust Score</span>
+                 </div>
+                 <div className="text-right">
+                    <span className={`text-xl font-black block ${quote?.trust_score >= 90 ? 'text-emerald-400' : 'text-amber-400'}`}>{quote?.trust_score || 100}</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">/ 100</span>
+                 </div>
+             </div>
+             
+             <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden mb-3">
+                 <div className={`h-full rounded-full transition-all duration-1000 ${quote?.trust_score >= 90 ? 'w-[98%] bg-emerald-500 glow' : 'w-[50%] bg-amber-500'}`}></div>
+             </div>
+             
+             {quote?.multiplier < 1 ? (
+                 <div className="flex items-center space-x-2 text-[10px] font-black text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-lg">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span>PERFECT RECORD (4 WEEKS) • {Math.round((1 - quote.multiplier) * 100)}% PREMIUM DISCOUNT APPLIED</span>
+                 </div>
+             ) : (
+                 <div className="flex items-center space-x-2 text-[10px] font-black text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>STAY CLAIM-FREE FOR 4 WEEKS TO UNLOCK PREMIUM DISCOUNT</span>
+                 </div>
+             )}
+          </div>
         </div>
       </div>
 
@@ -519,7 +558,7 @@ const WorkerDashboard = ({ userMeta, quote, fetchQuote, liveWeather }) => {
         <div className="col-span-1 md:col-span-2 bg-white border border-slate-200 rounded-[2rem] p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col md:flex-row items-center justify-between group hover:border-emerald-200 transition-colors">
           <div className="flex-1 w-full md:pr-8">
             <h3 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Real-Time Open-Meteo SDK</h3>
-            <p className="text-sm font-medium text-slate-500 mb-6 font-mono bg-slate-50 p-2 text-center md:text-left rounded-lg border border-slate-100">lat: {ZONES_LAT_LON[userMeta.zone.split(',')[0]]?.lat || '12.9'} / lon: {ZONES_LAT_LON[userMeta.zone.split(',')[0]]?.lon || '77.6'}</p>
+            <p className="text-sm font-medium text-slate-500 mb-6 font-mono bg-slate-50 p-2 text-center md:text-left rounded-lg border border-slate-100">lat: {ZONES_LAT_LON[userMeta?.zone?.split(',')[0]]?.lat || '12.9'} / lon: {ZONES_LAT_LON[userMeta?.zone?.split(',')[0]]?.lon || '77.6'}</p>
             
             <div className="grid grid-cols-2 gap-4">
                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4">
@@ -578,8 +617,10 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
   const [audioText, setAudioText] = useState('')
   const [useVoice, setUseVoice] = useState(false)
   const [mockExif, setMockExif] = useState(false)
+  const [successModal, setSuccessModal] = useState(null)
 
   const fetchWorkerData = async () => {
+    if (!userMeta) return
     try {
       const res = await fetch(`${API_BASE}/worker/data?phone=${userMeta.phone}`)
       const data = await res.json()
@@ -589,7 +630,7 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
   }
 
   const handleInitiateClaim = async () => {
-    if (!selectedOrder) return
+    if (!selectedOrder || !userMeta) return
     setLoading(true)
     const payload = { 
       phone: userMeta.phone, 
@@ -604,7 +645,13 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
       })
       const data = await res.json()
       if (data.status === 'approved') {
-        alert("💰 INSTANT PAYOUT APPROVED! 💰\nTxn: " + data.txn_id)
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.5 },
+          colors: ['#059669', '#34d399', '#ffffff', '#10b981']
+        })
+        setSuccessModal(data)
       } else {
         alert("⚠️ CLAIM FLAGGED FOR REVIEW ⚠️\n" + data.message)
       }
@@ -619,7 +666,37 @@ const ClaimsView = ({ userMeta, liveWeather }) => {
   useEffect(() => { fetchWorkerData() }, [])
 
   return (
-    <div className="p-8 max-w-[1200px] mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-[1200px] mx-auto space-y-6">
+      {successModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-[2rem] p-6 md:p-8 max-w-sm w-full shadow-2xl relative overflow-hidden animate-in slide-in-from-bottom-8 zoom-in-95 mx-4">
+            <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-emerald-400 to-sky-500"></div>
+            <button onClick={() => setSuccessModal(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            
+            <div className="flex flex-col items-center text-center mt-4">
+              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
+                <CheckCircle className="w-10 h-10 text-emerald-600 animate-[bounce_1s_ease-in-out_infinite]" />
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tighter mb-2">Claim Approved!</h3>
+              <p className="text-sm font-bold text-slate-500 mb-8">AI Validation Complete. Funds are immediately available.</p>
+              
+              <div className="w-full bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-6 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-transparent"></div>
+                <span className="relative z-10 text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Razorpay Instant Transfer</span>
+                <span className="relative z-10 text-4xl font-black text-emerald-600 tracking-tighter block mb-1">₹{successModal.payout}</span>
+                <span className="relative z-10 text-[10px] font-mono text-slate-400 bg-slate-200 px-2 py-0.5 rounded">Txn: {successModal.txn_id}</span>
+              </div>
+              
+              <button 
+                onClick={() => setSuccessModal(null)}
+                className="w-full bg-slate-900 text-white font-black py-4 rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm group hover:border-emerald-200 transition-colors">
@@ -767,8 +844,8 @@ const DigitalTwinMap = () => {
                 <div 
                   key={cell.id} 
                   className={`rounded-[2px] transition-all duration-[2000ms] ease-in-out ${
-                    cell.risk === 'high' ? 'bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse' : 
-                    cell.risk === 'medium' ? 'bg-amber-500/40 hover:bg-amber-500/60' : 
+                    cell.risk === 'high' ? 'bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-[pulse_1s_infinite]' : 
+                    cell.risk === 'medium' ? 'bg-amber-500/40 hover:bg-amber-500/60 transition-all duration-1000 animate-[pulse_3s_infinite]' : 
                     'bg-slate-800/40 hover:bg-slate-600/60'
                   }`}
                 />
@@ -786,6 +863,7 @@ const DigitalTwinMap = () => {
 
 const AdminDashboard = ({ adminData, onUpdate }) => {
   const [processing, setProcessing] = useState(null)
+  const [nlqSearch, setNlqSearch] = useState('')
 
   const handleUpdateClaim = async (claimId, status) => {
     setProcessing(claimId)
@@ -797,6 +875,17 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
       onUpdate()
     } finally { setProcessing(null) }
   }
+  
+  // Basic NLP filter simulation
+  const filteredClaims = adminData?.claims?.filter(c => c.status === 'pending').filter(c => {
+      const search = nlqSearch.toLowerCase()
+      if (!search) return true
+      if (search.includes("flag") && c.fraud_flag) return true
+      if (search.includes("zone a") && c.zone === 'Zone A') return true
+      if (c.agent_name.toLowerCase().includes(search)) return true
+      if (!c.fraud_flag && search.includes("flag")) return false
+      return true
+  })
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
@@ -820,10 +909,21 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
-        <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-2xl font-black text-slate-800 tracking-tight">Claims Approval Queue</h3>
-          <div className="flex space-x-2">
-            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black tracking-widest px-3 py-1.5 rounded-full border border-emerald-200">LIVE SQL STREAM</span>
+        <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+             <h3 className="text-2xl font-black text-slate-800 tracking-tight">Claims Approval Queue</h3>
+             <span className="hidden md:inline-block bg-emerald-100 text-emerald-800 text-[10px] font-black tracking-widest px-3 py-1.5 rounded-full border border-emerald-200">LIVE SQL STREAM</span>
+          </div>
+          
+          <div className="relative max-w-md w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+            <input 
+               type="text" 
+               value={nlqSearch}
+               onChange={(e) => setNlqSearch(e.target.value)}
+               placeholder='Ask: "Show me flagged claims..."'
+               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-sm"
+            />
           </div>
         </div>
         
@@ -838,7 +938,7 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {adminData?.claims?.filter(c => c.status === 'pending').map(c => (
+              {filteredClaims?.map(c => (
                 <tr key={c.id} className="group hover:bg-slate-50 transition-colors">
                   <td className="px-8 py-6">
                     <p className="font-black text-slate-800 text-sm">{c.agent_name}</p>
@@ -852,7 +952,12 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
                   <td className="px-8 py-6 max-w-xs">
                     <p className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg inline-block">{c.reason}</p>
                     {c.fraud_flag && c.fraud_reason && (
-                      <p className="text-[10px] text-rose-600 mt-2 font-black uppercase tracking-wide bg-rose-50 p-2 rounded border border-rose-100">{c.fraud_reason}</p>
+                      <p className="text-[10px] text-rose-600 mt-2 font-black uppercase tracking-wide bg-rose-50 p-2 rounded border border-rose-100 block w-fit">{c.fraud_reason}</p>
+                    )}
+                    {c.confidence_score !== undefined && c.confidence_score !== null && (
+                      <span className={`mt-2 flex items-center px-2 py-1 rounded text-[10px] font-black tracking-wider w-fit border ${c.confidence_score >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'}`}>
+                         Authenticity: {c.confidence_score}% {c.confidence_score >= 85 && '- ELA Clean'}
+                      </span>
                     )}
                     <p className="text-[10px] text-slate-400 mt-2 font-bold">{c.timestamp.replace('T', ' ').slice(0,16)}</p>
                   </td>
@@ -881,9 +986,9 @@ const AdminDashboard = ({ adminData, onUpdate }) => {
                   </td>
                 </tr>
               ))}
-              {adminData?.claims?.filter(c => c.status === 'pending').length === 0 && (
+              {filteredClaims?.length === 0 && (
                 <tr>
-                   <td colSpan="4" className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Everything is audited. No pending claims.</td>
+                   <td colSpan="4" className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Everything is audited. No pending claims matching query.</td>
                 </tr>
               )}
             </tbody>
@@ -958,9 +1063,9 @@ const PolicyView = ({ userMeta, quote }) => {
             <div className="bg-slate-50 border border-slate-200 p-8 rounded-[2rem] shadow-inner">
                <div className="flex items-center mb-4">
                  <Shield className="w-8 h-8 text-emerald-600 mr-3" />
-                 <h3 className="text-2xl font-black text-slate-800 font-mono tracking-tight">Policy #GS-{userMeta.phone.slice(-4)}-{userMeta.zone.slice(0,3).toUpperCase()}</h3>
+                 <h3 className="text-2xl font-black text-slate-800 font-mono tracking-tight">Policy #GS-{userMeta?.phone?.slice(-4)}-{userMeta?.zone?.slice(0,3).toUpperCase()}</h3>
                </div>
-               <p className="text-slate-500 font-medium mb-8 max-w-xl leading-relaxed">Continuous parametric protection for {userMeta.platform} earnings in your highly specific active zone: {userMeta.zone}. Trigger alerts are monitored 24/7 without deductibles.</p>
+               <p className="text-slate-500 font-medium mb-8 max-w-xl leading-relaxed">Continuous parametric protection for {userMeta?.platform} earnings in your highly specific active zone: {userMeta?.zone}. Trigger alerts are monitored 24/7 without deductibles.</p>
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-slate-200">
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Weekly Premium</p>

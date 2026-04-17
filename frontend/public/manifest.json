@@ -1,0 +1,16 @@
+{
+  "short_name": "GigShield",
+  "name": "GigShield Protection App",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#059669"
+}

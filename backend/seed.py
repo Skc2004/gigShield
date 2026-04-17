@@ -86,6 +86,7 @@ def seed_db():
                     txn_id=f"pi_test_{uuid.uuid4().hex[:12]}" if status == 'approved' else None,
                     fraud_flag=is_fraud,
                     fraud_reason="EXIF location far from live ping (diff: 0.08)" if is_fraud else None,
+                    confidence_score=round(random.uniform(40, 80), 2) if is_fraud else round(random.uniform(90, 100), 2),
                     timestamp=(datetime.now() - timedelta(days=random.randint(0, 30))).isoformat()
                 )
                 db.session.add(claim)

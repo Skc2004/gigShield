@@ -1,47 +1,54 @@
 import random
 from datetime import datetime
 
-def perform_ela_check(image_file):
-    # Simulates Error Level Analysis (ELA) check on an uploaded image
-    # In a real enterprise app, we'd use OpenCV or a DL model here.
-    # We will simulate a 10% chance of detecting digital tampering.
-    score = random.uniform(0, 100)
-    is_tampered = score > 90 
-    return is_tampered, round(score, 2)
+def check_fraud_confidence(exif_data, live_lat, live_lon, is_ela_simulated=False):
+    """
+    Simulates checking an image through Dual-Domain Forgery Detection (ELA + Generative AI footprints) 
+    and EXIF analysis. Returns a confidence score of authenticity (0-100%).
+    """
+    confidence = 100.0
+    audit_trail = []
 
-def verify_exif_data(exif_data, live_lat, live_lon):
-    """
-    Simulates cross-referencing EXIF data with live coordinates.
-    exif_data might contain {"lat": ..., "lon": ..., "timestamp": ...}
-    """
+    # 1. ELA & Generative AI Scan (Simulated)
+    if is_ela_simulated:
+        ela_penalty = random.uniform(50, 95)
+        confidence -= ela_penalty
+        audit_trail.append(f"AI Forensics: Generative or ELA Tampering detected (Penalty: -{ela_penalty:.1f}%)")
+
+    # 2. EXIF Cross-referencing
     if not exif_data:
-        return False, "No EXIF data provided - potential screenshot or edited file"
-    
-    ex_lat = exif_data.get('lat')
-    ex_lon = exif_data.get('lon')
-    
-    if ex_lat is None or ex_lon is None:
-        return False, "Missing GPS metadata in image"
+        confidence -= 50
+        audit_trail.append("EXIF Metadata Scrubbed or Missing")
+    else:
+        ex_lat = exif_data.get('lat')
+        ex_lon = exif_data.get('lon')
         
-    # Simulate a distance check using basic Pythagorean (mocking haversine)
-    diff = ((ex_lat - live_lat)**2 + (ex_lon - live_lon)**2)**0.5
-    
-    # If the distance is significant (e.g. diff > 0.05 approx 5km)
-    if diff > 0.05:
-        return True, f"Image GPS spoofed. EXIF location is far from live ping (diff: {diff:.3f})"
-        
-    # Time check simulation
-    ex_time_str = exif_data.get('timestamp')
-    if ex_time_str:
-        try:
-            ex_time = datetime.fromisoformat(ex_time_str)
-            time_diff = (datetime.now() - ex_time).total_seconds()
-            if time_diff > 3600: # 1 hour old
-                return True, "Image is outdated. Timestamp > 1h ago"
-        except Exception:
-            pass
+        if ex_lat is None or ex_lon is None:
+            confidence -= 30
+            audit_trail.append("GPS Coordinates missing from EXIF")
+        else:
+            diff = ((ex_lat - live_lat)**2 + (ex_lon - live_lon)**2)**0.5
+            if diff > 0.05:
+                penalty = min(diff * 500, 80) # scale penalty with distance
+                confidence -= penalty
+                audit_trail.append(f"GPS Spoofing. Device > 5km from image origin (Penalty: -{penalty:.1f}%)")
 
-    return False, "Clean"
+        ex_time_str = exif_data.get('timestamp')
+        if ex_time_str:
+            try:
+                ex_time = datetime.fromisoformat(ex_time_str)
+                time_diff = (datetime.now() - ex_time).total_seconds()
+                if time_diff > 3600:
+                    penalty = min((time_diff / 3600) * 10, 60)
+                    confidence -= penalty
+                    audit_trail.append(f"Temporal Mismatch. Image is outdated (Penalty: -{penalty:.1f}%)")
+            except:
+                confidence -= 10
+                audit_trail.append("Invalid Timestamp format")
+
+    final_confidence = max(0.0, round(confidence, 2))
+    return final_confidence, audit_trail
+
 
 def process_voice_claim(audio_text):
     """

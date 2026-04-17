@@ -58,6 +58,6 @@ class Claim(db.Model):
     exif_lon = db.Column(db.Float, nullable=True)
     exif_timestamp = db.Column(db.String(50), nullable=True)
     fraud_flag = db.Column(db.Boolean, default=False)
-    fraud_reason = db.Column(db.String(255), nullable=True)
+    fraud_reason = db.Column(db.String(500), nullable=True)
+    confidence_score = db.Column(db.Float, default=100.0)
     audio_transcript = db.Column(db.Text, nullable=True)
-
