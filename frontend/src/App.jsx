@@ -3,7 +3,7 @@ import {
   Shield, Zap, AlertTriangle, TrendingUp, Clock, MapPin, 
   Activity, CheckCircle, X, FileText, BarChart3, List, 
   User as UserIcon, LogOut, Search, Filter, ArrowRight,
-  Database, RefreshCcw, Bell, Smartphone, Globe, Info, Home, User, ThermometerSun, CloudRain, ChevronDown, Lock
+  Database, RefreshCcw, Bell, Smartphone, Globe, Info, Home, User, ThermometerSun, CloudRain, ChevronDown, Lock, Menu
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area
@@ -62,8 +62,8 @@ const PayoutChart = ({ data, type = 'line', xKey = 'date', yKey = 'amount' }) =>
 }
 
 const AnalyticsModal = ({ isOpen, onClose, userRole, userMeta }) => {
-  const [data, setData] = useState({ daily: [], monthly: [] })
-  const [period, setPeriod] = useState('monthly') // 'daily' or 'monthly'
+  const [data, setData] = useState({ timeline: [], daily: [], monthly: [] })
+  const [period, setPeriod] = useState('timeline') // 'timeline', 'daily', or 'monthly'
 
   useEffect(() => {
     if (isOpen) {
@@ -91,8 +91,9 @@ const AnalyticsModal = ({ isOpen, onClose, userRole, userMeta }) => {
         
         <div className="p-8">
           <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit mb-8">
-            <button onClick={() => setPeriod('daily')} className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${period === 'daily' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Daily View</button>
-            <button onClick={() => setPeriod('monthly')} className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${period === 'monthly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Monthly Trend</button>
+            <button onClick={() => setPeriod('timeline')} className={`px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${period === 'timeline' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Timeline</button>
+            <button onClick={() => setPeriod('daily')} className={`px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${period === 'daily' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Daily Grouped</button>
+            <button onClick={() => setPeriod('monthly')} className={`px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${period === 'monthly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Monthly</button>
           </div>
 
           <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8">
@@ -107,8 +108,8 @@ const AnalyticsModal = ({ isOpen, onClose, userRole, userMeta }) => {
             </div>
             
             <PayoutChart 
-              data={period === 'daily' ? data.daily : data.monthly} 
-              xKey={period === 'daily' ? 'date' : 'month'}
+              data={period === 'timeline' ? (data.timeline || []) : period === 'daily' ? (data.daily || []) : (data.monthly || [])} 
+              xKey={period === 'timeline' ? 'time' : period === 'daily' ? 'date' : 'month'}
             />
           </div>
 
@@ -116,12 +117,12 @@ const AnalyticsModal = ({ isOpen, onClose, userRole, userMeta }) => {
             <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl">
               <p className="text-xs font-black text-emerald-600/60 uppercase tracking-widest mb-1">TOTAL VOLUME</p>
               <h3 className="text-2xl font-black text-emerald-800">
-                ₹{ (period === 'daily' ? data.daily : data.monthly).reduce((acc, curr) => acc + curr.amount, 0).toLocaleString() }
+                ₹{ (period === 'timeline' ? (data.timeline || []) : period === 'daily' ? (data.daily || []) : (data.monthly || [])).reduce((acc, curr) => acc + curr.amount, 0).toLocaleString() }
               </h3>
             </div>
             <div className="bg-amber-50 border border-amber-100 p-6 rounded-3xl">
               <p className="text-xs font-black text-amber-600/60 uppercase tracking-widest mb-1">DATA POINTS</p>
-              <h3 className="text-2xl font-black text-amber-800">{ (period === 'daily' ? data.daily : data.monthly).length } Records</h3>
+              <h3 className="text-2xl font-black text-amber-800">{ (period === 'timeline' ? (data.timeline || []) : period === 'daily' ? (data.daily || []) : (data.monthly || [])).length } Nodes</h3>
             </div>
           </div>
         </div>
@@ -137,7 +138,7 @@ const LiveBackground = () => (
   </div>
 )
 
-const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
+const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta, isOpen, setIsOpen }) => {
   const tabs = [
     { id: 'home', label: userRole === 'admin' ? 'Dashboard' : 'Home', icon: Home },
     ...(userRole === 'worker' ? [
@@ -151,53 +152,64 @@ const Sidebar = ({ activeTab, setActiveTab, userRole, onLogout, userMeta }) => {
   ]
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen fixed left-0 top-0 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-      <div className="p-6">
-        <div className="flex items-center space-x-2">
-          <Shield className="w-8 h-8 text-emerald-700" />
-          <div>
-            <h1 className="text-xl font-bold text-slate-800 leading-none">GigShield</h1>
-            <p className="text-[10px] text-slate-500 mt-1">The Resilient Guardian</p>
+    <>
+      <div className={`fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}></div>
+      <div className={`w-72 md:w-64 bg-white border-r border-slate-200 flex flex-col h-screen fixed left-0 top-0 z-50 shadow-2xl md:shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-transform duration-300 md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 flex justify-between items-start">
+          <div className="flex items-center space-x-2">
+            <Shield className="w-8 h-8 text-emerald-700" />
+            <div>
+              <h1 className="text-xl font-bold text-slate-800 leading-none">GigShield</h1>
+              <p className="text-[10px] text-slate-500 mt-1">The Resilient Guardian</p>
+            </div>
+          </div>
+          <button onClick={() => setIsOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
+        </div>
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setIsOpen(false); }}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === tab.id ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
+            >
+              <tab.icon className="w-5 h-5" />
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="p-4 border-t border-slate-100 flex flex-col space-y-4 shrink-0">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-800 font-bold uppercase shrink-0">
+                {userRole === 'admin' ? 'AD' : userMeta?.phone?.slice(-2) || 'WK'}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-bold text-slate-800 truncate">{userRole === 'admin' ? 'System Admin' : `+91 ******${userMeta?.phone?.slice(-4) || '0000'}`}</p>
+                <p className="text-xs text-emerald-600 font-bold capitalize">{userRole}</p>
+              </div>
+            </div>
+            <button onClick={onLogout} className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50 shrink-0">
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
-      <nav className="flex-1 px-4 py-6 space-y-2">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === tab.id ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
-          >
-            <tab.icon className="w-5 h-5" />
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="p-4 border-t border-slate-100 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-800 font-bold uppercase">
-            {userRole === 'admin' ? 'AD' : userMeta?.phone?.slice(-2) || 'WK'}
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-800">{userRole === 'admin' ? 'System Admin' : `+91 ******${userMeta?.phone?.slice(-4) || '0000'}`}</p>
-            <p className="text-xs text-emerald-600 font-bold capitalize">{userRole}</p>
-          </div>
-        </div>
-        <button onClick={onLogout} className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50">
-          <LogOut className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
+    </>
   )
 }
 
-const Header = ({ title, userRole, userMeta, liveWeather, onOpenAnalytics, notifications = [] }) => {
+const Header = ({ title, userRole, userMeta, liveWeather, onOpenAnalytics, notifications = [], onOpenSidebar }) => {
   const [showNotif, setShowNotif] = useState(false)
   const pendingCount = notifications.filter(n => !n.read).length
 
   return (
-    <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-[100] w-full">
-      <h2 className="text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
+    <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-[30] w-full">
+      <div className="flex items-center space-x-4">
+        <button onClick={onOpenSidebar} className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+          <Menu className="w-6 h-6" />
+        </button>
+        <h2 className="hidden md:block text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
+      </div>
       
       <div className="flex items-center space-x-6">
         <button onClick={onOpenAnalytics} className="flex items-center space-x-2 bg-emerald-50 text-emerald-700 px-5 py-2.5 rounded-full font-bold hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm group">
@@ -254,6 +266,8 @@ const LandingPage = ({ onLogin }) => {
   const [zone, setZone] = useState('')
   const [platform, setPlatform] = useState('')
   const [password, setPassword] = useState('')
+  const [dailyEarnings, setDailyEarnings] = useState('')
+  const [workingHours, setWorkingHours] = useState('')
   const [showPasswordField, setShowPasswordField] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -304,7 +318,11 @@ const LandingPage = ({ onLogin }) => {
     try {
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, name, base_location: zone, company: platform, password })
+        body: JSON.stringify({ 
+          phone, name, base_location: zone, company: platform, password,
+          daily_earnings: parseFloat(dailyEarnings) || 1000,
+          working_hours: parseInt(workingHours) || 8
+        })
       })
       const data = await res.json()
       if (data.success) {
@@ -322,8 +340,8 @@ const LandingPage = ({ onLogin }) => {
 
   if (step === 'register') {
     return (
-      <div className="min-h-screen relative z-10 flex flex-col justify-center items-center p-6">
-        <div className="bg-white border text-center border-slate-100 rounded-[2rem] p-10 shadow-2xl shadow-slate-200/50 max-w-xl w-full">
+      <div className="min-h-screen relative z-10 flex flex-col justify-center items-center p-6 mt-12 md:mt-0 pb-12">
+        <div className="bg-white border text-center border-slate-100 rounded-[2rem] p-8 md:p-10 shadow-2xl shadow-slate-200/50 max-w-xl w-full">
            <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-100">
             <UserIcon className="w-10 h-10 text-emerald-600" />
            </div>
@@ -342,10 +360,21 @@ const LandingPage = ({ onLogin }) => {
                <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">CREATE PASSWORD / PIN</label>
                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold tracking-widest" />
              </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div>
+                 <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">DAILY EARNINGS (₹)</label>
+                 <input type="number" value={dailyEarnings} onChange={e => setDailyEarnings(e.target.value)} placeholder="e.g. 1500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold" />
+               </div>
+               <div>
+                 <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">WORKING HOURS</label>
+                 <input type="number" value={workingHours} onChange={e => setWorkingHours(e.target.value)} placeholder="e.g. 8" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800 font-bold" />
+               </div>
+             </div>
              
                  <div>
                    <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2 block">SELECT PRIMARY DOMAIN</label>
-                   <div className="grid grid-cols-3 gap-2">
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                      {['Food', 'Grocery', 'E-commerce'].map((domain) => (
                        <button key={domain} onClick={() => setPlatform(domain)} className={`p-4 rounded-xl border text-center transition-all ${platform === domain ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-slate-200 hover:bg-slate-50'}`}>
                          <h3 className="font-bold text-slate-800 text-sm">{domain}</h3>
@@ -379,9 +408,9 @@ const LandingPage = ({ onLogin }) => {
 
   // default to login
   return (
-    <div className="min-h-screen relative z-10 flex flex-col md:flex-row">
-      <div className="flex-1 p-12 flex flex-col justify-center">
-        <div className="max-w-xl">
+    <div className="min-h-screen relative z-10 flex flex-col md:flex-row pb-12 md:pb-0">
+      <div className="flex-1 p-8 md:p-12 flex flex-col justify-center">
+        <div className="max-w-xl mt-8 md:mt-0">
           <div className="flex items-center space-x-2 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <Shield className="w-10 h-10 text-emerald-700" />
             <span className="text-3xl font-bold text-slate-800 tracking-tight">GigShield</span>
@@ -396,7 +425,7 @@ const LandingPage = ({ onLogin }) => {
         </div>
       </div>
 
-      <div className="w-full md:w-[480px] bg-white border-l border-slate-200 p-8 flex flex-col justify-center shadow-[0_0_80px_rgba(0,0,0,0.03)] z-20">
+      <div className="w-full md:w-[480px] bg-white border-none md:border-l border-slate-200 p-6 md:p-8 flex flex-col justify-center shadow-[0_0_80px_rgba(0,0,0,0.03)] z-20">
         <div className="bg-white border text-center border-slate-100 rounded-[2rem] p-10 shadow-2xl shadow-slate-200/50">
           <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-100">
             <Lock className="w-10 h-10 text-emerald-600" />
@@ -543,7 +572,7 @@ const WorkerDashboard = ({ userMeta, activePolicy, lifetimePayout, quote, fetchQ
           </div>
           <div className="relative z-10">
             <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2">Total Protected Income</p>
-            <p className="text-5xl md:text-7xl font-black text-slate-800 tracking-tighter">₹{((userMeta?.daily_earnings || 1000) * 30).toLocaleString()}</p>
+            <p className="text-5xl md:text-7xl font-black text-slate-800 tracking-tighter">₹{((userMeta?.daily_earnings || 0) * 30).toLocaleString()}</p>
             <div className="flex justify-between items-center mt-6 pt-6 border-t border-slate-100">
               <div className="flex items-center text-xs font-bold text-slate-500">
                 <Smartphone className="w-4 h-4 mr-2 text-emerald-600" /> Linked to {userMeta?.company} UPI
@@ -958,6 +987,7 @@ const PolicyView = ({ userMeta, activePolicy }) => {
 export default function App() {
   const [role, setRole] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [userMeta, setUserMeta] = useState(null)
   const [activePolicy, setActivePolicy] = useState(null)
   const [lifetimePayout, setLifetimePayout] = useState(0)
@@ -1083,8 +1113,8 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       <LiveBackground />
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={role} onLogout={handleLogout} userMeta={userMeta} />
-      <div className="flex-1 ml-64 flex flex-col h-screen overflow-y-auto relative z-10 selection:bg-emerald-200">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={role} onLogout={handleLogout} userMeta={userMeta} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <div className="flex-1 md:ml-64 flex flex-col h-screen overflow-y-auto relative z-10 selection:bg-emerald-200">
         <Header 
           title={getPageTitle()} 
           userRole={role} 
@@ -1092,6 +1122,7 @@ export default function App() {
           liveWeather={liveWeather} 
           onOpenAnalytics={() => setShowAnalytics(true)}
           notifications={notifications}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
         />
         <main className="flex-1 overflow-x-hidden pt-4 pb-12">
           {activeTab === 'home' && role === 'worker' && <WorkerDashboard userMeta={userMeta} activePolicy={activePolicy} lifetimePayout={lifetimePayout} quote={quote} fetchQuote={fetchQuote} liveWeather={liveWeather} onAcceptQuote={handleAcceptQuote} />}

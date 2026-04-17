@@ -97,7 +97,8 @@ def check_user():
                 "access_token": access_token,
                 "user": {
                     "id": user.id, "phone": user.phone, "name": user.name, "role": user.role,
-                    "base_location": user.base_location, "company": user.company
+                    "base_location": user.base_location, "company": user.company,
+                    "daily_earnings": user.daily_earnings, "working_hours": user.working_hours
                 }
             })
         elif not password:
@@ -141,7 +142,8 @@ def register_user():
         "access_token": access_token,
         "user": {
             "id": user.id, "phone": user.phone, "name": user.name, "role": user.role,
-            "base_location": user.base_location, "company": user.company
+            "base_location": user.base_location, "company": user.company,
+            "daily_earnings": user.daily_earnings, "working_hours": user.working_hours
         }
     })
 
@@ -325,12 +327,25 @@ def initiate_claim():
     existing = Claim.query.filter_by(order_id=order_id).first()
     if existing: return jsonify({"success": False, "message": "Claim already initiated for this order."})
 
+    # 2. Distance & Severity Based Payout Algorithm
+    base_order_value = (order.distance_km * 14.0) + (order.time_taken_mins * 2.0)
+    
+    severity_mult = 1.5
+    if simulate:
+        severity_mult = 3.5 # Simulated catastrophic event
+    elif rain_mm > 15.0 or curr_t > 42.0:
+        severity_mult = 2.5
+    elif rain_mm > 5.0 or curr_t > 40.0:
+        severity_mult = 2.0
+
+    calculated_payout = round(base_order_value * severity_mult, 2)
+    
     new_claim = Claim(
         user_id=user_id, 
         policy_id=policy.id,
         order_id=order_id,
         trigger_event=trigger_event,
-        payout_amount=policy.quote.coverage_payout,
+        payout_amount=calculated_payout,
         status='pending',
         reason='Loss of Income - Parametric Trigger'
     )
@@ -399,14 +414,18 @@ def get_analytics():
     
     daily = {}
     monthly = {}
+    timeline = []
     
     for c in claims:
         d_str = c.timestamp[:10]
         m_str = c.timestamp[:7]
+        t_str = c.timestamp[11:19] # HH:MM:SS
         daily[d_str] = daily.get(d_str, 0) + c.payout_amount
         monthly[m_str] = monthly.get(m_str, 0) + c.payout_amount
+        timeline.append({"time": t_str, "amount": c.payout_amount})
         
     return jsonify({
+        "timeline": timeline,
         "daily": sorted([{"date": k, "amount": v} for k, v in daily.items()], key=lambda x: x['date']),
         "monthly": sorted([{"month": k, "amount": v} for k, v in monthly.items()], key=lambda x: x['month'])
     })
